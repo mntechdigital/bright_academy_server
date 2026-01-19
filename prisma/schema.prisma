@@ -8,11 +8,55 @@ datasource db {
 }
 
 model Student {
-  id         Int      @id @default(autoincrement())
-  firstName  String
-  lastName   String
-  email      String   @unique
-  phone      String   @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  name        String
+  classId     Int
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  sectionId   Int
+  section     Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  parentPhone String
+  address     String
+  gender      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Class {
+  id         Int       @id @default(autoincrement())
+  className  String    @unique
+  subjects   Subject[]
+  sections   Section[]
+  students   Student[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Subject {
+  id          Int      @id @default(autoincrement())
+  subjectName String
+  classId     Int
+  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([classId, subjectName])
+}
+
+model Section {
+  id          Int       @id @default(autoincrement())
+  sectionName String
+  classId     Int
+  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  students    Student[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([classId, sectionName])
+}
+
+model Teacher {
+  id        String   @id
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
