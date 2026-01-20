@@ -7,11 +7,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+enum RoleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Role {
+  id          String        @id @default(uuid())
+  name        String        @unique
+  status      RoleStatus    @default(ACTIVE)
+  isDeleted   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  roleFeature RoleFeature[]
+  adminUser   AdminUser[]
+}
+
+model RoleFeature {
+  id     String @id @default(uuid())
+  name   String
+  index  Int
+  path   String
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+}
+
+enum AdminUserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model AdminUser {
+  id           String          @id @default(uuid())
+  fullName     String
+  email        String          @unique
+  password     String
+  profilePhoto String?         @db.LongText
+  status       AdminUserStatus @default(ACTIVE)
+  roleId       String
+  role         Role            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+enum Status {
+  ACTIVE
+  INACTIVE
+}
+
+
+
+
 model Student {
   id          Int      @id @default(autoincrement())
   name        String
   classId     Int
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  stdClass    StdClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
   sectionId   Int
   section     Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   parentPhone String
@@ -21,7 +73,7 @@ model Student {
   updatedAt   DateTime @updatedAt
 }
 
-model Class {
+model StdClass {
   id         Int       @id @default(autoincrement())
   className  String    @unique
   subjects   Subject[]
@@ -35,7 +87,7 @@ model Subject {
   id          Int      @id @default(autoincrement())
   subjectName String
   classId     Int
-  class       Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  stdClass    StdClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -46,7 +98,7 @@ model Section {
   id          Int       @id @default(autoincrement())
   sectionName String
   classId     Int
-  class       Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  stdClass    StdClass     @relation(fields: [classId], references: [id], onDelete: Cascade)
   students    Student[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -55,7 +107,7 @@ model Section {
 }
 
 model Teacher {
-  id        String   @id
+  id        String   @id @default(uuid())
   password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -13,7 +13,7 @@ export const seedRoleAdmin = async () => {
         data: {
           name: seedRoleAdminData.name,
           roleFeature: {
-            create: seedRoleAdminData.roleFeature.map((roleFeature) => {
+            create: seedRoleAdminData.roleFeature.map((roleFeature: { name: string; path: string; index: number }) => {
               return {
                 name: roleFeature.name,
                 path: roleFeature.path,
