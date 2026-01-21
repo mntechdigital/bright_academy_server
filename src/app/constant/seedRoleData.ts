@@ -8,6 +8,7 @@ export const seedRoleAdminData: TAdminRole = {
     { name: 'Roles & Permissions', path: 'roles_permissions', index: 2 },
     { name: 'Student Classes', path: 'studentClasses', index: 3 },
     { name: 'Student Sections', path: 'studentSections', index: 4 },
+    { name: 'Subjects', path: 'subjects', index: 5 },
   ],
 };
 
@@ -16,4 +17,5 @@ export const featureNames = {
   rolesAndPermissions: 'roles_permissions',
   studentClasses: 'studentClasses',
   studentSections: 'studentSections',
+  subjects: 'subjects',
 };
