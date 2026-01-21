@@ -45,7 +45,7 @@ const getAll = async (query: Record<string, any>) => {
   };
 };
 
-const getById = async (id: number) => {
+const getById = async (id: string) => {
   return prisma.stdClass.findUniqueOrThrow({
     where: { id },
     include: {
@@ -56,7 +56,7 @@ const getById = async (id: number) => {
   });
 };
 
-const update = async (id: number, payload: any) => {
+const update = async (id: string, payload: any) => {
   await prisma.stdClass.findUniqueOrThrow({
     where: { id },
   });
@@ -68,7 +68,7 @@ const update = async (id: number, payload: any) => {
   });
 };
 
-const deleteStdClass = async (id: number) => {
+const deleteStdClass = async (id: string) => {
   await prisma.stdClass.findUniqueOrThrow({
     where: { id },
   });

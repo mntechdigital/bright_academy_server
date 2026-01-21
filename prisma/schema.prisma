@@ -60,11 +60,11 @@ enum Status {
 
 
 model Student {
-  id          Int      @id @default(autoincrement())
+  id          String      @id @default(uuid())
   name        String
-  classId     Int
+  classId     String
   stdClass    StdClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  sectionId   Int
+  sectionId   String
   section     Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   parentPhone String
   address     String
@@ -74,7 +74,7 @@ model Student {
 }
 
 model StdClass {
-  id         Int       @id @default(autoincrement())
+  id         String       @id @default(uuid())
   className  String    @unique
   subjects   Subject[]
   sections   Section[]
@@ -84,9 +84,9 @@ model StdClass {
 }
 
 model Subject {
-  id          Int      @id @default(autoincrement())
+  id          String      @id @default(uuid())
   subjectName String
-  classId     Int
+  classId     String
   stdClass    StdClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -95,9 +95,9 @@ model Subject {
 }
 
 model Section {
-  id          Int       @id @default(autoincrement())
+  id          String       @id @default(uuid())
   sectionName String
-  classId     Int
+  classId     String
   stdClass    StdClass     @relation(fields: [classId], references: [id], onDelete: Cascade)
   students    Student[]
   createdAt   DateTime  @default(now())

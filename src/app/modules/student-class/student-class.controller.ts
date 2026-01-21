@@ -25,7 +25,7 @@ const getAllStudentClasses = catchAsync(async (req, res) => {
 
 
 const getStudentClassById = catchAsync(async (req, res) => {
-	const response = await studentClassService.getById(Number(req.params.id));
+	const response = await studentClassService.getById(req.params.id as string);
 	sendResponse(res, {
 		statusCode: 200,
 		success: true,
@@ -36,7 +36,7 @@ const getStudentClassById = catchAsync(async (req, res) => {
 
 
 const updateStudentClass = catchAsync(async (req, res) => {
-	const response = await studentClassService.update(Number(req.params.id), req.body);
+	const response = await studentClassService.update(req.params.id as string, req.body);
 	sendResponse(res, {
 		statusCode: 200,
 		success: true,
@@ -47,7 +47,7 @@ const updateStudentClass = catchAsync(async (req, res) => {
 
 
 const deleteStudentClass = catchAsync(async (req, res) => {
-	const response = await studentClassService.delete(Number(req.params.id));
+	const response = await studentClassService.delete(req.params.id as string);
 	sendResponse(res, {
 		statusCode: 200,
 		success: true,
