@@ -9,7 +9,7 @@ const router = Router();
 router.post(
   '/',
   auth([featureNames.studentClasses]),
-  validation(StudentClassValidation.createStudentClassValidation),
+  validation(StudentClassValidation.createClassSchema),
   studentClassController.createStudentClass,
 );
 
@@ -21,7 +21,7 @@ router.get('/:id', studentClassController.getStudentClassById);
 router.put(
   '/:id',
   auth([featureNames.studentClasses]),
-  validation(StudentClassValidation.updateStudentClassValidation),
+  validation(StudentClassValidation.updateClassSchema),
   studentClassController.updateStudentClass,
 );
 

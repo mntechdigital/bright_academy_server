@@ -1,18 +1,19 @@
 import { z } from "zod";
 
-const createStudentClassValidation = z.object({
+const createClassSchema = z.object({
   body: z.object({
-    className: z.string({ required_error: "Class name is required" }),
-  }),
+    className: z.string({ required_error: 'class is required' }).min(1, 'class cannot be empty'),
+  })
 });
 
-const updateStudentClassValidation = z.object({
+
+const updateClassSchema = z.object({
   body: z.object({
     className: z.string().optional(),
   }),
 });
 
 export const StudentClassValidation = {
-  createStudentClassValidation,
-  updateStudentClassValidation,
+  createClassSchema,
+  updateClassSchema,
 };

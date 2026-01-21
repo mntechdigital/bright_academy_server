@@ -1,10 +1,10 @@
 import prisma from '../../../db/db.config';
 import { builderQuery } from '../../builders/prismaBuilderQuery';
 
-const create = async (payload: { className: string }) => {
+const create = async (payload: any) => {
   return prisma.stdClass.create({
     data: {
-      className: payload.className,
+      ...payload,
     },
   });
 };
@@ -56,7 +56,7 @@ const getById = async (id: number) => {
   });
 };
 
-const update = async (id: number, payload: { className?: string }) => {
+const update = async (id: number, payload: any) => {
   await prisma.stdClass.findUniqueOrThrow({
     where: { id },
   });
