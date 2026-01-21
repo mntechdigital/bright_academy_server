@@ -1,11 +1,11 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import config from './app/configs';
-import router from './app/types';
 import { globalErrorHandler } from './app/middlewares/globalErrorHandler';
 import notFoundErrorHandler from './app/middlewares/notFoundErrorHandler';
 import { seedRoleAdmin } from './app/utils/seedRoleAdmin';
 import cookieParser from 'cookie-parser';
+import router from './app/routes';
 
 // Initialize the express application
 const app: Application = express();
@@ -41,7 +41,7 @@ app.get('/', (req, res) => {
 });
 
 // Importing routes
-// app.use('/api/v1', router);
+app.use('/api/v1', router);
 
 // Error handling middleware
 app.use(globalErrorHandler);

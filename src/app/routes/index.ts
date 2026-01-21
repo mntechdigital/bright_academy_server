@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import { TModuleRoute } from '../types/moduleRoute.type';
+import { StudentClassRoutes } from '../modules/student-class/student-class.routes';
 
 
 const router = Router();
 
 const moduleRoutes: TModuleRoute[] = [
-//   {
-//     path: '/contactus',
-//     route: ContactUsRoutes,
-//   },
+  {
+    path: '/studentClasses',
+    route: StudentClassRoutes,
+  },
 //   {
 //     path: '/blogs',
 //     route: BlogRoutes,
