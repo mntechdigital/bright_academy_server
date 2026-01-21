@@ -9,6 +9,7 @@ export const seedRoleAdminData: TAdminRole = {
     { name: 'Student Classes', path: 'studentClasses', index: 3 },
     { name: 'Student Sections', path: 'studentSections', index: 4 },
     { name: 'Subjects', path: 'subjects', index: 5 },
+    { name: 'Students', path: 'students', index: 6 },
   ],
 };
 
@@ -18,4 +19,5 @@ export const featureNames = {
   studentClasses: 'studentClasses',
   studentSections: 'studentSections',
   subjects: 'subjects',
+  students: 'students',
 };

@@ -3,6 +3,7 @@ import { TModuleRoute } from '../types/moduleRoute.type';
 import { StudentClassRoutes } from '../modules/student-class/student-class.routes';
 import { StudentSectionRoutes } from '../modules/student-section/student-section.routes';
 import { SubjectRoutes } from '../modules/subject/subject.routes';
+import { StudentRoutes } from '../modules/student/student.routes';
 
 
 const router = Router();
@@ -19,6 +20,10 @@ const moduleRoutes: TModuleRoute[] = [
   {
     path: '/subjects',
     route: SubjectRoutes,
+  },
+  {
+    path: '/students',
+    route: StudentRoutes,
   },
 //   {
 //     path: '/blogs',
