@@ -8,7 +8,7 @@ const router = Router();
 
 router.post(
   '/',
-  auth([featureNames.studentClasses]),
+  auth([featureNames.classes]),
   validation(StudentClassValidation.createClassSchema),
   studentClassController.createStudentClass,
 );
@@ -20,20 +20,14 @@ router.get('/:id', studentClassController.getStudentClassById);
 
 router.put(
   '/:id',
-  auth([featureNames.studentClasses]),
+  auth([featureNames.classes]),
   validation(StudentClassValidation.updateClassSchema),
   studentClassController.updateStudentClass,
 );
 
 router.delete(
   '/:id',
-  auth([featureNames.studentClasses]),
-  studentClassController.deleteStudentClass,
-);
-
-router.delete(
-  '/:id',
-  auth([featureNames.studentClasses]),
+  auth([featureNames.classes]),
   studentClassController.deleteStudentClass,
 );
 
