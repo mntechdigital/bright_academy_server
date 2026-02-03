@@ -9,7 +9,7 @@ const router = Router();
 
 router.post(
   '/',
-  auth([featureNames.studentSections]),
+  auth([featureNames.sections]),
   validation(StudentSectionValidation.createSectionSchema),
   studentSectionController.createStudentSection,
 );
@@ -20,14 +20,14 @@ router.get('/:id', studentSectionController.getStudentSectionById);
 
 router.put(
   '/:id',
-  auth([featureNames.studentSections]),
+  auth([featureNames.sections]),
   validation(StudentSectionValidation.updateSectionSchema),
   studentSectionController.updateStudentSection,
 );
 
 router.delete(
   '/:id',
-  auth([featureNames.studentSections]),
+  auth([featureNames.sections]),
   studentSectionController.deleteStudentSection,
 );
 

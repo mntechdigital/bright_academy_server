@@ -2,6 +2,27 @@ import prisma from '../../../db/db.config';
 import { builderQuery } from '../../builders/prismaBuilderQuery';
 
 const create = async (payload: any) => {
+  const existingSection = await prisma.section.findFirst({
+    where: {
+      sectionName: payload.sectionName,
+      classId: payload.classId,
+    },
+  });
+
+  if (existingSection) {
+    throw new Error(`Section with name "${payload.sectionName}" already exists for this class`);
+  }
+
+  const sectionCount = await prisma.section.count({
+    where: {
+      classId: payload.classId,
+    },
+  });
+
+  if (sectionCount >= 2) {
+    throw new Error('Maximum limit reached. You can only add up to 2 sections per class.');
+  }
+
   return prisma.section.create({
     data: {
       ...payload,
