@@ -73,7 +73,7 @@ model StdClass {
   id        String    @id @default(uuid())
   className String    @unique
   subjects  Subject[]
-  sections  Section[]
+  sections  Section[] @relation("ClassSections")
   students  Student[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -91,15 +91,12 @@ model Subject {
 }
 
 model Section {
-  id          String    @id @default(uuid())
-  sectionName String    @unique
-  classId     String?
-  stdClass    StdClass? @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Section_classId_fkey")
+  id          String     @id @default(uuid())
+  sectionName String     @unique
+  classes     StdClass[] @relation("ClassSections")
   students    Student[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([classId])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 model Teacher {
