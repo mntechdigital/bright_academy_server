@@ -1,7 +1,17 @@
 import prisma from '../../../db/db.config';
 import { builderQuery } from '../../builders/prismaBuilderQuery';
+import AppError from '../../errors/AppError';
 
 const create = async (payload: any) => {
+  // Verify that the class exists before creating the subject
+  const classExists = await prisma.stdClass.findUnique({
+    where: { id: payload.classId },
+  });
+
+  if (!classExists) {
+    throw new AppError(404, `Class with ID ${payload.classId} does not exist`);
+  }
+
   return prisma.subject.create({
     data: {
       ...payload,
@@ -54,6 +64,18 @@ const update = async (id: string, payload: any) => {
   await prisma.subject.findUniqueOrThrow({
     where: { id },
   });
+
+  // If classId is being updated, verify that the new class exists
+  if (payload.classId) {
+    const classExists = await prisma.stdClass.findUnique({
+      where: { id: payload.classId },
+    });
+
+    if (!classExists) {
+      throw new AppError(404, `Class with ID ${payload.classId} does not exist`);
+    }
+  }
+
   return prisma.subject.update({
     where: { id },
     data: {

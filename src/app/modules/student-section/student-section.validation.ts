@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const createSectionSchema = z.object({
   body: z.object({
-    sectionName: z.string({ required_error: 'Section name is required' }).min(1, 'Section name cannot be empty'),
+    sectionName: z.enum(['A', 'B'], { errorMap: () => ({ message: 'Section name must be either "A" or "B"' }) }),
     classId: z.string({ required_error: 'Class ID is required' }).min(1, 'Class ID cannot be empty'),
   })
 });
