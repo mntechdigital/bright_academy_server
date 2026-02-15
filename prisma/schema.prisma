@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 enum RoleStatus {
   ACTIVE
   INACTIVE
@@ -56,16 +55,13 @@ enum Status {
   INACTIVE
 }
 
-
-
-
 model Student {
-  id          String      @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
   classId     String
-  stdClass    StdClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  stdClass    StdClass @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Student_stdClass_fkey")
   sectionId   String
-  section     Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  section     Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade, map: "Student_section_fkey")
   parentPhone String
   address     String
   gender      String
@@ -74,20 +70,20 @@ model Student {
 }
 
 model StdClass {
-  id         String       @id @default(uuid())
-  className  String    @unique
-  subjects   Subject[]
-  sections   Section[]
-  students   Student[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id        String    @id @default(uuid())
+  className String    @unique
+  subjects  Subject[]
+  sections  Section[]
+  students  Student[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Subject {
-  id          String      @id @default(uuid())
+  id          String   @id @default(uuid())
   subjectName String
   classId     String
-  stdClass    StdClass    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  stdClass    StdClass @relation(fields: [classId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -95,15 +91,15 @@ model Subject {
 }
 
 model Section {
-  id          String       @id @default(uuid())
-  sectionName String
-  classId     String
-  stdClass    StdClass     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  sectionName String    @unique
+  classId     String?
+  stdClass    StdClass? @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Section_classId_fkey")
   students    Student[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([classId, sectionName])
+  @@index([classId])
 }
 
 model Teacher {

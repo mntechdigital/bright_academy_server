@@ -1,12 +1,34 @@
 import prisma from '../../../db/db.config';
 import { builderQuery } from '../../builders/prismaBuilderQuery';
+import AppError from '../../errors/AppError';
 
 const create = async (payload: any) => {
-  return prisma.stdClass.create({
+  // Check if class with this name already exists
+  const existingClass = await prisma.stdClass.findUnique({
+    where: { className: payload.className },
+  });
+
+  if (existingClass) {
+    throw new AppError(409, `Class "${payload.className}" already exists`);
+  }
+
+  // Get all existing sections from database
+  const existingSections = await prisma.section.findMany();
+
+  // Create the class and link all existing sections
+  const newClass = await prisma.stdClass.create({
     data: {
-      ...payload,
+      className: payload.className,
+      sections: {
+        connect: existingSections.map((section) => ({ id: section.id })),
+      },
+    },
+    include: {
+      sections: true,
     },
   });
+
+  return newClass;
 };
 
 const getAll = async (query: Record<string, any>) => {

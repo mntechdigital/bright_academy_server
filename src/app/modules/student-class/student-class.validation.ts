@@ -3,6 +3,7 @@ import { z } from "zod";
 const createClassSchema = z.object({
   body: z.object({
     className: z.string({ required_error: 'class is required' }).min(1, 'class cannot be empty'),
+    sectionId: z.string().optional(),
   })
 });
 
@@ -10,6 +11,7 @@ const createClassSchema = z.object({
 const updateClassSchema = z.object({
   body: z.object({
     className: z.string().optional(),
+    sectionId: z.string().optional(),
   }),
 });
 
