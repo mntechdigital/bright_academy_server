@@ -51,6 +51,7 @@ const getAll = async (query: Record<string, any>) => {
     include: {
       subjects: true,
       sections: true,
+      students: true,
       _count: {
         select: { students: true },
       },
