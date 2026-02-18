@@ -12,6 +12,7 @@ export const seedRoleAdminData: TAdminRole = {
     { name: 'Students', path: '/students', index: 6 },
     { name: 'Teachers', path: '/teachers', index: 7 },
     { name: 'Result', path: '/result', index: 8 },
+    { name: 'Weekly Marks Sheets', path: '/weekly-marks-sheets', index: 9 },
   ],
 };
 
@@ -24,4 +25,5 @@ export const featureNames = {
   students: '/students',
   teachers: '/teachers',
   result: '/result',
+  weeklyMarksSheets: '/weekly-marks-sheets',
 };

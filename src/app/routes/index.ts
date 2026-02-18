@@ -6,6 +6,7 @@ import { SubjectRoutes } from '../modules/subject/subject.routes';
 import { StudentRoutes } from '../modules/student/student.routes';
 import { AuthRoutes } from '../modules/auth/auth.routes';
 import { RoleRoutes } from '../modules/role/role.routes';
+import WeeklyMarksSheetRoutes from '../modules/weekly-marks-sheet/weekly-marks-sheet.routes';
 
 
 const router = Router();
@@ -14,7 +15,11 @@ const moduleRoutes: TModuleRoute[] = [
   {
     path: '/auth',
     route: AuthRoutes,
-  },
+  }, 
+  {
+    path: '/weekly-marks-sheets',
+    route: WeeklyMarksSheetRoutes,
+  }, 
   {
     path: '/roles_permissions',
     route: RoleRoutes,
