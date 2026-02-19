@@ -52,3 +52,14 @@ export const deleteWeeklyMarksSheet = catchAsync(async (req: Request, res: Respo
     data: result,
   });
 });
+
+
+export const upsertStudentObtainedMarks = catchAsync(async (req: Request, res: Response) => {
+  const result = await weeklyMarksSheetService.upsertStudentObtainedMarks(req.body);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Obtained marks saved/updated successfully",
+    data: result,
+  });
+});

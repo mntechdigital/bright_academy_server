@@ -65,6 +65,7 @@ model Student {
   parentPhone String
   address     String
   gender      String
+  weeklyMarksSheets WeeklyMarksSheet[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -121,5 +122,12 @@ model WeeklyMarksSheet {
   sectionId     String
   subject       Subject  @relation(fields: [subjectId], references: [id])
   subjectId     String
+  student       Student?  @relation(fields: [studentId], references: [id])
+  studentId     String?
   totalMarks    Int
+  obtainedMarks Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([studentId, subjectId, week, year])
 }

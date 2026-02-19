@@ -94,3 +94,37 @@ export const deleteWeeklyMarksSheet = async (id: string) => {
     where: { id },
   });
 };
+
+export const upsertStudentObtainedMarks = async (payload: {
+  studentId: string;
+  subjectId: string;
+  week: string;
+  year: string;
+  obtainedMarks: number;
+}) => {
+  // Validate required fields
+  const requiredFields = ['studentId', 'subjectId', 'week', 'year', 'obtainedMarks'];
+  for (const field of requiredFields) {
+    if (
+      payload[field as keyof typeof payload] === undefined ||
+      payload[field as keyof typeof payload] === null
+    ) {
+      throw new Error(`Field "${field}" is required.`);
+    }
+  }
+
+  // Only update obtainedMarks for the identified record
+  return prisma.weeklyMarksSheet.update({
+    where: {
+      studentId_subjectId_week_year: {
+        studentId: payload.studentId,
+        subjectId: payload.subjectId,
+        week: payload.week,
+        year: payload.year,
+      },
+    },
+    data: {
+      obtainedMarks: Number(payload.obtainedMarks),
+    },
+  });
+};
