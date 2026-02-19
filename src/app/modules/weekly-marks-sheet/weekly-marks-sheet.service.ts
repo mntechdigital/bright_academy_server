@@ -97,13 +97,10 @@ export const deleteWeeklyMarksSheet = async (id: string) => {
 
 export const upsertStudentObtainedMarks = async (payload: {
   studentId: string;
-  subjectId: string;
-  week: string;
-  year: string;
   obtainedMarks: number;
 }) => {
   // Validate required fields
-  const requiredFields = ['studentId', 'subjectId', 'week', 'year', 'obtainedMarks'];
+  const requiredFields = ['studentId','obtainedMarks'];
   for (const field of requiredFields) {
     if (
       payload[field as keyof typeof payload] === undefined ||
@@ -114,14 +111,9 @@ export const upsertStudentObtainedMarks = async (payload: {
   }
 
   // Only update obtainedMarks for the identified record
-  return prisma.weeklyMarksSheet.update({
+  return prisma.weeklyMarksSheet.updateMany({
     where: {
-      studentId_subjectId_week_year: {
-        studentId: payload.studentId,
-        subjectId: payload.subjectId,
-        week: payload.week,
-        year: payload.year,
-      },
+      studentId: payload.studentId,
     },
     data: {
       obtainedMarks: Number(payload.obtainedMarks),
