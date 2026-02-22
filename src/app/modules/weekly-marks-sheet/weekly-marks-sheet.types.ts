@@ -8,4 +8,5 @@ export interface IWeeklyMarksSheet {
   sectionId: string;
   subjectId: string;
   totalMarks: number;
+  obtainedMarks: number;
 }

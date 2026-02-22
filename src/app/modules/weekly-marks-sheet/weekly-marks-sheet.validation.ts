@@ -9,6 +9,7 @@ export const createWeeklyMarksSheetSchema = z.object({
   sectionId: z.string(),
   subjectId: z.string(),
   totalMarks: z.number(),
+  obtainedMarks: z.number().optional(),
 });
 
 // Add more validation schemas as needed
