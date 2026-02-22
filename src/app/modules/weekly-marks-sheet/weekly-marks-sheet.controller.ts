@@ -57,7 +57,7 @@ export const deleteWeeklyMarksSheet = catchAsync(async (req: Request, res: Respo
 export const upsertStudentObtainedMarks = catchAsync(async (req: Request, res: Response) => {
   const result = await weeklyMarksSheetService.upsertStudentObtainedMarks(req.body);
   sendResponse(res, {
-    statusCode: 200,
+    statusCode: 201,
     success: true,
     message: "Obtained marks saved/updated successfully",
     data: result,
