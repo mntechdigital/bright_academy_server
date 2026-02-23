@@ -54,6 +54,22 @@ export const deleteWeeklyMarksSheet = catchAsync(async (req: Request, res: Respo
 });
 
 
+// delete all weekly marks sheets
+export const deleteWeeklyMarksSheetsBySectionAndClass = catchAsync(async (req: Request, res: Response) => {
+  const { sectionId, stdClassId } = req.body;
+  const result = await weeklyMarksSheetService.deleteWeeklyMarksSheetsBySectionAndClass({
+    sectionId: sectionId as string,
+    stdClassId: stdClassId as string,
+  });
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "All Weekly Marks Sheets deleted successfully",
+    data: result,
+  });
+});
+
+
 export const upsertStudentObtainedMarks = catchAsync(async (req: Request, res: Response) => {
   const result = await weeklyMarksSheetService.upsertStudentObtainedMarks(req.body);
   sendResponse(res, {

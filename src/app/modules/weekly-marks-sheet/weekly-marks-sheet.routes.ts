@@ -5,8 +5,14 @@ const router = Router();
 
 router.post("/", weeklyMarksSheetController.createWeeklyMarksSheet);
 router.get("/", weeklyMarksSheetController.getAllWeeklyMarksSheets);
+
+// ✅ STATIC ROUTE আগে
+router.delete("/section-class", weeklyMarksSheetController.deleteWeeklyMarksSheetsBySectionAndClass);
+router.post("/obtained-marks", weeklyMarksSheetController.upsertStudentObtainedMarks);
+
+// ✅ তারপর dynamic routes
 router.get("/:id", weeklyMarksSheetController.getWeeklyMarksSheetById);
 router.patch("/:id", weeklyMarksSheetController.updateWeeklyMarksSheet);
 router.delete("/:id", weeklyMarksSheetController.deleteWeeklyMarksSheet);
-router.post("/obtained-marks", weeklyMarksSheetController.upsertStudentObtainedMarks);
+
 export default router;
