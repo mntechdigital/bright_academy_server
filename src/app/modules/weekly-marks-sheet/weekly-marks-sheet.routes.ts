@@ -12,7 +12,7 @@ router.post("/obtained-marks", weeklyMarksSheetController.upsertStudentObtainedM
 
 // ✅ তারপর dynamic routes
 router.get("/:id", weeklyMarksSheetController.getWeeklyMarksSheetById);
-router.patch("/:id", weeklyMarksSheetController.updateWeeklyMarksSheet);
+router.put("/:id", weeklyMarksSheetController.updateWeeklyMarksSheet);
 router.delete("/:id", weeklyMarksSheetController.deleteWeeklyMarksSheet);
 
 export default router;

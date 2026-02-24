@@ -73,13 +73,14 @@ export const getWeeklyMarksSheetById = async (id: string) => {
 };
 
 export const updateWeeklyMarksSheet = async (id: string, payload: any) => {
-  const { classId, stdClassId, sectionId, subjectId, ...rest } = payload;
+  const { classId, stdClassId, sectionId, subjectId, studentId, ...rest } = payload;
   const finalStdClassId = stdClassId || classId;
   const updateData: any = { ...rest };
   if (finalStdClassId)
     updateData.stdClass = { connect: { id: finalStdClassId } };
   if (sectionId) updateData.section = { connect: { id: sectionId } };
   if (subjectId) updateData.subject = { connect: { id: subjectId } };
+  if (studentId) updateData.student = { connect: { id: studentId } };
   return prisma.weeklyMarksSheet.update({
     where: { id },
     data: updateData,
