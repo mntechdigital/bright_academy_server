@@ -56,51 +56,53 @@ enum Status {
 }
 
 model Student {
-  id          String   @id @default(uuid())
-  name        String
-  classId     String
-  stdClass    StdClass @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Student_stdClass_fkey")
-  sectionId   String
-  section     Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade, map: "Student_section_fkey")
-  parentPhone String
-  address     String
-  gender      String
-  weeklyMarksSheets WeeklyMarksSheet[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String              @id @default(uuid())
+  name               String
+  classId            String
+  stdClass           StdClass            @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Student_stdClass_fkey")
+  sectionId          String
+  section            Section             @relation(fields: [sectionId], references: [id], onDelete: Cascade, map: "Student_section_fkey")
+  parentPhone        String
+  address            String
+  gender             String
+  weeklyMarksSheets  WeeklyMarksSheet[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  monthlyExamResults MonthlyExamResult[]
 }
 
 model StdClass {
-  id          String       @id @default(uuid())
-  className   String       @unique
-  subjects    Subject[]
-  sections    Section[]    @relation("ClassSections")
-  students    Student[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                String             @id @default(uuid())
+  className         String             @unique
+  subjects          Subject[]
+  sections          Section[]          @relation("ClassSections")
+  students          Student[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   weeklyMarksSheets WeeklyMarksSheet[]
 }
 
 model Subject {
-  id          String   @id @default(uuid())
-  subjectName String
-  classId     String
-  stdClass    StdClass @relation(fields: [classId], references: [id], onDelete: Cascade)
-  weeklyMarksSheets WeeklyMarksSheet[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String              @id @default(uuid())
+  subjectName        String
+  classId            String
+  stdClass           StdClass            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  weeklyMarksSheets  WeeklyMarksSheet[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  monthlyExamResults MonthlyExamResult[]
 
   @@unique([classId, subjectName])
 }
 
 model Section {
-  id          String     @id @default(uuid())
-  sectionName String     @unique
-  classes     StdClass[] @relation("ClassSections")
-  students    Student[]
+  id                String             @id @default(uuid())
+  sectionName       String             @unique
+  classes           StdClass[]         @relation("ClassSections")
+  students          Student[]
   weeklyMarksSheets WeeklyMarksSheet[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model Teacher {
@@ -122,7 +124,7 @@ model WeeklyMarksSheet {
   sectionId     String
   subject       Subject  @relation(fields: [subjectId], references: [id])
   subjectId     String
-  student       Student?  @relation(fields: [studentId], references: [id])
+  student       Student? @relation(fields: [studentId], references: [id])
   studentId     String?
   totalMarks    Int
   obtainedMarks Int?
@@ -130,4 +132,25 @@ model WeeklyMarksSheet {
   updatedAt     DateTime @updatedAt
 
   @@unique([studentId, subjectId, week, year])
+}
+
+model MonthlyExamResult {
+  id            String   @id @default(uuid())
+  student       Student  @relation(fields: [studentId], references: [id])
+  studentId     String
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  subjectId     String
+  fullMarks     Int
+  highestMark   Int
+  marksObtained Int
+  point         Float
+  grade         String
+  totalMarks    Int
+  gpa           Float
+  gradePoint    String
+  position      String
+  preenst       Boolean
+  absent        Boolean
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
