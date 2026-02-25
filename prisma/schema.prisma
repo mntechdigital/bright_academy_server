@@ -134,23 +134,55 @@ model WeeklyMarksSheet {
   @@unique([studentId, subjectId, week, year])
 }
 
+// model MonthlyExamResult {
+//   id            String   @id @default(uuid())
+//   student       Student  @relation(fields: [studentId], references: [id])
+//   studentId     String
+//   subjects      Json
+//   totalMarks    Int
+//   gpa           Float
+//   grade         String
+//   position      String
+//   present       Int
+//   absent        Int
+//   createdAt     DateTime @default(now())
+//   updatedAt     DateTime @updatedAt
+// }
+
 model MonthlyExamResult {
-  id            String   @id @default(uuid())
-  student       Student  @relation(fields: [studentId], references: [id])
-  studentId     String
-  subject       Subject  @relation(fields: [subjectId], references: [id])
-  subjectId     String
-  fullMarks     Int
-  highestMark   Int
-  marksObtained Int
-  point         Float
-  grade         String
-  totalMarks    Int
-  gpa           Float
-  gradePoint    String
-  position      String
-  preenst       Boolean
-  absent        Boolean
+  id String @id @default(uuid())
+
+  student   Student @relation(fields: [studentId], references: [id])
+  studentId String
+
+  totalMarks Int
+  gpa        Float
+  grade      String
+  position   String
+  present    Int
+  absent     Int
+
+  results SubjectResult[]
+
+  subjectId String?
+  subject   Subject? @relation(fields: [subjectId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SubjectResult {
+  id           String  @id @default(uuid())
+  subjectName  String
+  marks        Int
+  fullMarks    Int
+  highestMark  Int
+  point        Float
+  grade        String
+
+  examResult   MonthlyExamResult @relation(fields: [examResultId], references: [id], onDelete: Cascade)
+  examResultId String
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
