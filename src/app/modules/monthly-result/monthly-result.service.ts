@@ -39,7 +39,12 @@ const getAll = async (query: Record<string, any>) => {
   const response = await prisma.monthlyExamResult.findMany({
     ...monthlyResultQuery,
     include: {
-      student: true,
+      student: {
+        include: {
+          section: true,
+          stdClass: true,
+        },
+      },
       results: true,
     },
   });
@@ -73,10 +78,28 @@ const getById = async (id: string) => {
  * Update Monthly Result
  */
 const update = async (id: string, payload: any) => {
+  // Destructure results from payload if present
+  const { results, ...restPayload } = payload;
+
+  // Prepare the update object for results if provided
+  let resultsUpdate = undefined;
+  if (Array.isArray(results)) {
+    resultsUpdate = {
+      update: results.map((result: any) => ({
+        where: { id: result.id },
+        data: {
+          marks: result.marks,
+          highestMark: result.highestMark,
+        },
+      })),
+    };
+  }
+
   return prisma.monthlyExamResult.update({
     where: { id },
     data: {
-      ...payload,
+      ...restPayload,
+      ...(resultsUpdate && { results: resultsUpdate }),
     },
     include: {
       student: true,

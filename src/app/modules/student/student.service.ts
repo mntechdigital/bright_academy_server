@@ -29,6 +29,8 @@ const getAll = async (query: Record<string, any>) => {
     include: {
       stdClass: true,
       section: true,
+      weeklyMarksSheets: true,
+      monthlyExamResults: true,
     },
   });
 
@@ -48,6 +50,8 @@ const getById = async (id: string) => {
     include: {
       stdClass: true,
       section: true,
+      weeklyMarksSheets: true,
+      monthlyExamResults: true,
     },
   });
 };
