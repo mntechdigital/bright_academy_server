@@ -14,6 +14,7 @@ export const validateMonthlyResult = z.object({
   position: z.string(),
   preenst: z.string(),
   absent: z.string(),
+  month: z.string(),
 });
 
 export const updatevalidateMonthlyResult = z.object({
@@ -30,4 +31,5 @@ export const updatevalidateMonthlyResult = z.object({
   position: z.string().optional(),
   preenst: z.string().optional(),
   absent: z.string().optional(),
+  month: z.string().optional(),
 });

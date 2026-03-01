@@ -6,6 +6,17 @@ import { builderQuery } from '../../builders/prismaBuilderQuery';
  * Create Monthly Result
  */
 const create = async (payload: any) => {
+  const existingResult = await prisma.monthlyExamResult.findFirst({
+    where: {
+      studentId: payload.studentId,
+      month: payload.month,
+    },
+  });
+
+  if (existingResult) {
+    throw new Error('Monthly result already exists for this student in this month');
+  }
+
   return prisma.monthlyExamResult.create({
     data: {
       ...payload,
