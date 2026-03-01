@@ -8,6 +8,7 @@ const createStudentSchema = z.object({
     parentPhone: z.string({ required_error: 'Parent phone is required' }).min(1, 'Parent phone cannot be empty'),
     address: z.string({ required_error: 'Address is required' }).min(1, 'Address cannot be empty'),
     gender: z.string({ required_error: 'Gender is required' }).min(1, 'Gender cannot be empty'),
+    stdRegNo: z.string({ required_error: 'Student registration number is required' }).min(1, 'Student registration number cannot be empty'),
   })
 });
 
@@ -19,6 +20,7 @@ const updateStudentSchema = z.object({
     parentPhone: z.string().optional(),
     address: z.string().optional(),
     gender: z.string().optional(),
+    stdRegNo: z.string().optional(),
   }),
 });
 

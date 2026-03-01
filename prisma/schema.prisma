@@ -58,6 +58,7 @@ enum Status {
 model Student {
   id                 String              @id @default(uuid())
   name               String
+  stdRegNo           String?             
   classId            String
   stdClass           StdClass            @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Student_stdClass_fkey")
   sectionId          String

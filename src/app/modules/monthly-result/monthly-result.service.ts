@@ -78,7 +78,12 @@ const getById = async (id: string) => {
   return prisma.monthlyExamResult.findUnique({
     where: { id },
     include: {
-      student: true,
+      student: {
+        include: {
+          section: true,
+          stdClass: true,
+        },
+      },
       results: true,
     },
   });

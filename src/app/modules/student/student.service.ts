@@ -2,6 +2,14 @@ import prisma from '../../../db/db.config';
 import { builderQuery } from '../../builders/prismaBuilderQuery';
 
 const create = async (payload: any) => {
+  const existingStudent = await prisma.student.findUnique({
+    where: { stdRegNo: payload.stdRegNo },
+  });
+
+  if (existingStudent) {
+    throw new Error(`A student with stdRegNo "${payload.stdRegNo}" already exists`);
+  }
+
   return prisma.student.create({
     data: {
       ...payload,
@@ -69,6 +77,7 @@ const update = async (id: string, payload: any) => {
       parentPhone: payload.parentPhone,
       address: payload.address,
       gender: payload.gender,
+      stdRegNo: payload.stdRegNo,
     },
   });
 };
