@@ -2,7 +2,7 @@ import prisma from '../../../db/db.config';
 import { builderQuery } from '../../builders/prismaBuilderQuery';
 
 const create = async (payload: any) => {
-  const existingStudent = await prisma.student.findUnique({
+  const existingStudent = await prisma.student.findFirst({
     where: { stdRegNo: payload.stdRegNo },
   });
 

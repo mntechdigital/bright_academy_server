@@ -8,6 +8,7 @@ import { AuthRoutes } from "../modules/auth/auth.routes";
 import { RoleRoutes } from "../modules/role/role.routes";
 import WeeklyMarksSheetRoutes from "../modules/weekly-marks-sheet/weekly-marks-sheet.routes";
 import { MonthlyResultRoutes } from "../modules/monthly-result/monthly-result.routes";
+import { TeacherRoutes } from '../modules/teacher/teacher.routes';
 
 const router = Router();
 
@@ -39,6 +40,10 @@ const moduleRoutes: TModuleRoute[] = [
   {
     path: "/students",
     route: StudentRoutes,
+  },
+  {
+    path: '/teachers',
+    route: TeacherRoutes,
   },
   {
     path: "/monthly-exam-results",
