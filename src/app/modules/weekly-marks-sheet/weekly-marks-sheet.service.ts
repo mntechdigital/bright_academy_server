@@ -2,23 +2,36 @@ import prisma from "../../../db/db.config";
 import { builderQuery } from "../../builders/prismaBuilderQuery";
 
 export const createWeeklyMarksSheet = async (payload: any) => {
-  const { classId, stdClassId, sectionId, subjectId, ...rest } = payload;
+  const { classId, stdClassId, sectionId, subjectId, month, week, ...rest } = payload;
 
-  // Use classId as stdClassId if provided for compatibility
   const finalStdClassId = stdClassId || classId;
 
-  if (!finalStdClassId || !sectionId || !subjectId) {
+  if (!finalStdClassId || !sectionId || !subjectId || !month || !week) {
     throw new Error(
-      "stdClassId (or classId), sectionId, and subjectId are required",
+      "stdClassId (or classId), sectionId, subjectId, month, and week are required",
     );
   }
 
-  // Remove stdClassId, sectionId, subjectId from rest if present
-  const { stdClassId: _s, sectionId: _sec, subjectId: _sub, ...data } = rest;
+  // Check if record with same subject, month, and week already exists
+  const existing = await prisma.weeklyMarksSheet.findFirst({
+    where: {
+      subjectId,
+      month,
+      week,
+      stdClassId: finalStdClassId,
+      sectionId,
+    },
+  });
+
+  if (existing) {
+    throw new Error("Record with same subject, month, and week already exists");
+  }
 
   return prisma.weeklyMarksSheet.create({
     data: {
-      ...data,
+      ...rest,
+      month,
+      week,
       stdClass: { connect: { id: finalStdClassId } },
       section: { connect: { id: sectionId } },
       subject: { connect: { id: subjectId } },
