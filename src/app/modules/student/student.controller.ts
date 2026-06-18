@@ -52,10 +52,34 @@ const deleteStudent = catchAsync(async (req, res) => {
 	});
 });
 
+const loginStudent = catchAsync(async (req, res) => {
+  const response = await studentService.login(req.body);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Login সফল হয়েছে',
+    data: response,
+  });
+});
+
+
+const getMyResults = catchAsync(async (req, res) => {
+  const studentId = (req as any).user.studentId; // middleware থেকে
+  const response = await studentService.getMyResults(studentId);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Result retrieved successfully',
+    data: response,
+  });
+});
+
 export const studentController = {
 	createStudent,
 	getAllStudents,
 	getStudentById,
 	updateStudent,
 	deleteStudent,
+	loginStudent, // ✅
+	getMyResults, // ✅
 };

@@ -24,7 +24,15 @@ const updateStudentSchema = z.object({
   }),
 });
 
+const loginSchema = z.object({
+  body: z.object({
+    userId: z.string({ required_error: 'User Id দিন' }),
+    password: z.string({ required_error: 'Password দিন' }),
+  }),
+});
+
 export const StudentValidation = {
   createStudentSchema,
   updateStudentSchema,
+  loginSchema,
 };
