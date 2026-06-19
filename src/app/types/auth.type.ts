@@ -4,9 +4,11 @@ export type TLogin = {
 };
 
 export type TJwtPayload = {
-  email: string;
-  fullName: string;
   role: string;
-  status: string;
   id?: string;
+  email?: string;
+  fullName?: string;
+  status?: string;
+  regNo?: string;
+  name?: string;
 };

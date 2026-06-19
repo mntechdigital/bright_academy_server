@@ -43,9 +43,61 @@ const deleteTeacher = catchAsync(async (req, res) => {
   });
 });
 
+// ----------------------------
+// নতুন: Teacher Login
+// ----------------------------
+const login = catchAsync(async (req, res) => {
+  const response = await teacherService.login(req.body);
+
+  res.cookie('refreshToken', response.refreshToken, {
+    httpOnly: true,
+    sameSite: true,
+    maxAge: 24 * 60 * 60 * 1000,
+  });
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Login Successful',
+    data: response,
+  });
+});
+
+// ----------------------------
+// নতুন: Refresh Token
+// ----------------------------
+const refreshToken = catchAsync(async (req, res) => {
+  const { refreshToken } = req.body;
+  const result = await teacherService.refreshToken(refreshToken);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Access token refreshed successfully',
+    data: result,
+  });
+});
+
+// ----------------------------
+// নতুন: লগইন করা Teacher এর নিজের তথ্য
+// ----------------------------
+const getMe = catchAsync(async (req, res) => {
+  const response = await teacherService.getMe(req.user);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Teacher details fetched successfully',
+    data: response,
+  });
+});
+
 export const teacherController = {
   getAllTeachers,
   getTeacherById,
   updateTeacher,
   deleteTeacher,
+  login,
+  refreshToken,
+  getMe,
 };

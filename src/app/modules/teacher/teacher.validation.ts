@@ -8,6 +8,16 @@ const updateTeacherSchema = z.object({
   }),
 });
 
+const loginSchema = z.object({
+  body: z.object({
+    regNo: z.string({ required_error: 'Registration number is required' }),
+    password: z
+      .string({ required_error: 'Password is required' })
+      .min(6, 'Password must be at least 6 characters long'),
+  }),
+});
+
 export const TeacherValidation = {
   updateTeacherSchema,
+  loginSchema,
 };
