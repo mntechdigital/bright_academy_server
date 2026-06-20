@@ -12,19 +12,13 @@ const create = async (payload: any) => {
     throw new AppError(409, `Class "${payload.className}" already exists`);
   }
 
-  // Get all existing sections from database
-  const existingSections = await prisma.section.findMany();
-
-  // Create the class and link all existing sections
   const newClass = await prisma.stdClass.create({
     data: {
       className: payload.className,
-      sections: {
-        connect: existingSections.map((section) => ({ id: section.id })),
-      },
     },
     include: {
-      sections: true,
+      subjects: true,
+      students: true,
     },
   });
 
@@ -50,7 +44,6 @@ const getAll = async (query: Record<string, any>) => {
     ...studentClassQuery,
     include: {
       subjects: true,
-      sections: true,
       students: true,
       _count: {
         select: { students: true },
@@ -73,7 +66,6 @@ const getById = async (id: string) => {
     where: { id },
     include: {
       subjects: true,
-      sections: true,
       students: true,
     },
   });

@@ -60,8 +60,6 @@ model Student {
   name               String
   classId            String
   stdClass           StdClass            @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Student_stdClass_fkey")
-  sectionId          String
-  section            Section             @relation(fields: [sectionId], references: [id], onDelete: Cascade, map: "Student_section_fkey")
   batchId            String?
   batch              Batch?              @relation(fields: [batchId], references: [id], onDelete: SetNull, map: "Student_batch_fkey")
   parentPhone        String
@@ -79,7 +77,6 @@ model StdClass {
   id                String             @id @default(uuid())
   className         String             @unique
   subjects          Subject[]
-  sections          Section[]          @relation("ClassSections")
   students          Student[]
   batches           Batch[]
   createdAt         DateTime           @default(now())
@@ -98,16 +95,6 @@ model Subject {
   monthlyExamResults MonthlyExamResult[]
 
   @@unique([classId, subjectName])
-}
-
-model Section {
-  id                String             @id @default(uuid())
-  sectionName       String             @unique
-  classes           StdClass[]         @relation("ClassSections")
-  students          Student[]
-  weeklyMarksSheets WeeklyMarksSheet[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
 }
 
 model Teacher {
@@ -141,8 +128,6 @@ model WeeklyMarksSheet {
   year          String
   stdClass      StdClass @relation(fields: [stdClassId], references: [id])
   stdClassId    String
-  section       Section  @relation(fields: [sectionId], references: [id])
-  sectionId     String
   subject       Subject  @relation(fields: [subjectId], references: [id])
   subjectId     String
   student       Student? @relation(fields: [studentId], references: [id])

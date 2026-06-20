@@ -6,7 +6,6 @@ export const createWeeklyMarksSheetSchema = z.object({
   publishedDate: z.string(),
   year: z.string(),
   stdClassId: z.string(),
-  sectionId: z.string(),
   subjectId: z.string(),
   totalMarks: z.number(),
   obtainedMarks: z.number().optional(),

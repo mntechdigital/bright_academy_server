@@ -20,8 +20,9 @@ const create = async (payload: any) => {
     payload.password = await bcrypt.hash(payload.password, 10);
   }
 
+  const { sectionId, ...restPayload } = payload;
   return prisma.student.create({
-    data: { ...payload },
+    data: restPayload,
   });
 };
 
@@ -33,17 +34,11 @@ const update = async (id: string, payload: any) => {
     payload.password = await bcrypt.hash(payload.password, 10);
   }
 
+  const { sectionId, ...restPayload } = payload;
   return prisma.student.update({
     where: { id },
     data: {
-      name: payload.name,
-      classId: payload.classId,
-      sectionId: payload.sectionId,
-      parentPhone: payload.parentPhone,
-      address: payload.address,
-      gender: payload.gender,
-      stdRegNo: payload.stdRegNo,
-      password: payload.password, // ✅ যোগ করুন
+      ...restPayload,
     },
   });
 };
@@ -54,7 +49,6 @@ const login = async (payload: { userId: string; password: string }) => {
     where: { stdRegNo: payload.userId },
     include: {
       stdClass: true,
-      section: true,
     },
   });
 
@@ -121,7 +115,6 @@ const getAll = async (query: Record<string, any>) => {
     ...studentQuery,
     include: {
       stdClass: true,
-      section: true,
       weeklyMarksSheets: true,
       monthlyExamResults: true,
     },
@@ -142,7 +135,6 @@ const getById = async (id: string) => {
     where: { id },
     include: {
       stdClass: true,
-      section: true,
       weeklyMarksSheets: true,
       monthlyExamResults: true,
     },
