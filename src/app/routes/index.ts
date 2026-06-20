@@ -9,6 +9,7 @@ import { RoleRoutes } from "../modules/role/role.routes";
 import WeeklyMarksSheetRoutes from "../modules/weekly-marks-sheet/weekly-marks-sheet.routes";
 import { MonthlyResultRoutes } from "../modules/monthly-result/monthly-result.routes";
 import { TeacherRoutes } from '../modules/teacher/teacher.routes';
+import { BatchRoutes } from "../batch/batch.route";
 
 const router = Router();
 
@@ -53,6 +54,10 @@ const moduleRoutes: TModuleRoute[] = [
     path: "/monthly-results",
     route: MonthlyResultRoutes,
   },
+  {
+    path: "/batches",
+    route: BatchRoutes,
+  }
 ];
 
 moduleRoutes.forEach((route) => {
