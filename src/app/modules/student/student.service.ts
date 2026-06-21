@@ -21,7 +21,7 @@ const create = async (payload: any) => {
   }
 
   return prisma.student.create({
-    data: { ...payload },
+    data: payload,
   });
 };
 
@@ -36,14 +36,7 @@ const update = async (id: string, payload: any) => {
   return prisma.student.update({
     where: { id },
     data: {
-      name: payload.name,
-      classId: payload.classId,
-      sectionId: payload.sectionId,
-      parentPhone: payload.parentPhone,
-      address: payload.address,
-      gender: payload.gender,
-      stdRegNo: payload.stdRegNo,
-      password: payload.password, // ✅ যোগ করুন
+      ...payload,
     },
   });
 };
@@ -54,7 +47,6 @@ const login = async (payload: { userId: string; password: string }) => {
     where: { stdRegNo: payload.userId },
     include: {
       stdClass: true,
-      section: true,
     },
   });
 
@@ -121,7 +113,7 @@ const getAll = async (query: Record<string, any>) => {
     ...studentQuery,
     include: {
       stdClass: true,
-      section: true,
+      batch: true,
       weeklyMarksSheets: true,
       monthlyExamResults: true,
     },
@@ -142,7 +134,7 @@ const getById = async (id: string) => {
     where: { id },
     include: {
       stdClass: true,
-      section: true,
+      batch: true,
       weeklyMarksSheets: true,
       monthlyExamResults: true,
     },
@@ -153,6 +145,12 @@ const deleteStudent = async (id: string) => {
   await prisma.student.findUniqueOrThrow({
     where: { id },
   });
+
+  // First delete related records to avoid foreign key constraint violation
+  await prisma.weeklyMarksSheet.deleteMany({ where: { studentId: id } });
+  // MonthlyExamResult has cascade to SubjectResult, so delete it directly
+  await prisma.monthlyExamResult.deleteMany({ where: { studentId: id } });
+
   return prisma.student.delete({ where: { id } });
 };
 

@@ -4,7 +4,6 @@ import config from './app/configs';
 import { globalErrorHandler } from './app/middlewares/globalErrorHandler';
 import notFoundErrorHandler from './app/middlewares/notFoundErrorHandler';
 import { seedRoleAdmin } from './app/utils/seedRoleAdmin';
-import { seedSections } from './app/utils/seedSection';
 import { seedTeachers } from './app/utils/seedTeacher';
 import cookieParser from 'cookie-parser';
 import router from './app/routes';
@@ -55,8 +54,6 @@ app.use(notFoundErrorHandler);
 app.listen(config.port, () => {
   // Seed the admin role if it doesn't exist
   seedRoleAdmin();
-  // Seed sections "A" and "B" for all classes
-  seedSections();
   // Seed 30 teachers
   seedTeachers();
   console.log(`Server is running on port ${config.port}`);

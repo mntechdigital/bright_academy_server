@@ -60,13 +60,13 @@ model Student {
   name               String
   classId            String
   stdClass           StdClass            @relation(fields: [classId], references: [id], onDelete: Cascade, map: "Student_stdClass_fkey")
-  sectionId          String
-  section            Section             @relation(fields: [sectionId], references: [id], onDelete: Cascade, map: "Student_section_fkey")
+  batchId            String?
+  batch              Batch?              @relation(fields: [batchId], references: [id], onDelete: SetNull, map: "Student_batch_fkey")
   parentPhone        String
   address            String
   gender             String
-  stdRegNo           String?             @unique // @unique যোগ করুন
-  password           String?             // new field for password
+  stdRegNo           String?             @unique
+  password           String?
   weeklyMarksSheets  WeeklyMarksSheet[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -77,8 +77,8 @@ model StdClass {
   id                String             @id @default(uuid())
   className         String             @unique
   subjects          Subject[]
-  sections          Section[]          @relation("ClassSections")
   students          Student[]
+  batches           Batch[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   weeklyMarksSheets WeeklyMarksSheet[]
@@ -97,16 +97,6 @@ model Subject {
   @@unique([classId, subjectName])
 }
 
-model Section {
-  id                String             @id @default(uuid())
-  sectionName       String             @unique
-  classes           StdClass[]         @relation("ClassSections")
-  students          Student[]
-  weeklyMarksSheets WeeklyMarksSheet[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-}
-
 model Teacher {
   id        String   @id @default(uuid())
   name      String
@@ -116,16 +106,32 @@ model Teacher {
   updatedAt DateTime @updatedAt
 }
 
+model Batch {
+  id                  String              @id @default(uuid())
+  name                String
+  startTime           String
+  endTime             String
+  classId             String
+  stdClass            StdClass            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  students            Student[]
+  weeklyMarksSheets   WeeklyMarksSheet[]
+  monthlyExamResults  MonthlyExamResult[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@unique([classId, name])
+}
+
 model WeeklyMarksSheet {
   id            String   @id @default(uuid())
   month         String
   week          String
   publishedDate String
   year          String
+  batch         Batch?   @relation(fields: [batchId], references: [id])
+  batchId       String?
   stdClass      StdClass @relation(fields: [stdClassId], references: [id])
   stdClassId    String
-  section       Section  @relation(fields: [sectionId], references: [id])
-  sectionId     String
   subject       Subject  @relation(fields: [subjectId], references: [id])
   subjectId     String
   student       Student? @relation(fields: [studentId], references: [id])
@@ -143,6 +149,9 @@ model MonthlyExamResult {
 
   student   Student @relation(fields: [studentId], references: [id])
   studentId String
+
+  batch   Batch? @relation(fields: [batchId], references: [id])
+  batchId String?
 
   totalMarks Int
   gpa        Float

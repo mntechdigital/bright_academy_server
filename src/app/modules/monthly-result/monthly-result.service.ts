@@ -52,10 +52,10 @@ const getAll = async (query: Record<string, any>) => {
     include: {
       student: {
         include: {
-          section: true,
           stdClass: true,
         },
       },
+      batch: true,
       results: true,
     },
   });
@@ -80,10 +80,10 @@ const getById = async (id: string) => {
     include: {
       student: {
         include: {
-          section: true,
           stdClass: true,
         },
       },
+      batch: true,
       results: true,
     },
   });

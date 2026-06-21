@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const validateMonthlyResult = z.object({
   studentId: z.string(),
+  batchId: z.string().optional(),
   subjectId: z.string(),
   fullMarks: z.number(),
   highestMark: z.number(),
@@ -19,6 +20,7 @@ export const validateMonthlyResult = z.object({
 
 export const updatevalidateMonthlyResult = z.object({
   studentId: z.string().optional(),
+  batchId: z.string().optional(),
   subjectId: z.string().optional(),
   fullMarks: z.number().optional(),
   highestMark: z.number().optional(),

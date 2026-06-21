@@ -2,13 +2,13 @@ import prisma from "../../../db/db.config";
 import { builderQuery } from "../../builders/prismaBuilderQuery";
 
 export const createWeeklyMarksSheet = async (payload: any) => {
-  const { classId, stdClassId, sectionId, subjectId, month, week, ...rest } = payload;
+  const { classId, stdClassId, batchId, subjectId, studentId, month, week, ...rest } = payload;
 
   const finalStdClassId = stdClassId || classId;
 
-  if (!finalStdClassId || !sectionId || !subjectId || !month || !week) {
+  if (!finalStdClassId || !subjectId || !month || !week) {
     throw new Error(
-      "stdClassId (or classId), sectionId, subjectId, month, and week are required",
+      "stdClassId (or classId), subjectId, month, and week are required",
     );
   }
 
@@ -19,7 +19,6 @@ export const createWeeklyMarksSheet = async (payload: any) => {
       month,
       week,
       stdClassId: finalStdClassId,
-      sectionId,
     },
   });
 
@@ -33,8 +32,9 @@ export const createWeeklyMarksSheet = async (payload: any) => {
       month,
       week,
       stdClass: { connect: { id: finalStdClassId } },
-      section: { connect: { id: sectionId } },
       subject: { connect: { id: subjectId } },
+      ...(batchId && { batch: { connect: { id: batchId } } }),
+      ...(studentId && { student: { connect: { id: studentId } } }),
     },
   });
 };
@@ -59,8 +59,9 @@ export const getAllWeeklyMarksSheets = async (query: Record<string, any>) => {
     ...weeklyMarksSheetQuery,
     include: {
       stdClass: true,
-      section: true,
       subject: true,
+      batch: true,
+      student: true,
     },
   });
 
@@ -79,19 +80,20 @@ export const getWeeklyMarksSheetById = async (id: string) => {
     where: { id },
     include: {
       stdClass: true,
-      section: true,
       subject: true,
+      batch: true,
+      student: true,
     },
   });
 };
 
 export const updateWeeklyMarksSheet = async (id: string, payload: any) => {
-  const { classId, stdClassId, sectionId, subjectId, studentId, ...rest } = payload;
+  const { classId, stdClassId, batchId, subjectId, studentId, ...rest } = payload;
   const finalStdClassId = stdClassId || classId;
   const updateData: any = { ...rest };
   if (finalStdClassId)
     updateData.stdClass = { connect: { id: finalStdClassId } };
-  if (sectionId) updateData.section = { connect: { id: sectionId } };
+  if (batchId) updateData.batch = { connect: { id: batchId } };
   if (subjectId) updateData.subject = { connect: { id: subjectId } };
   if (studentId) updateData.student = { connect: { id: studentId } };
   return prisma.weeklyMarksSheet.update({
@@ -99,8 +101,9 @@ export const updateWeeklyMarksSheet = async (id: string, payload: any) => {
     data: updateData,
     include: {
       stdClass: true,
-      section: true,
       subject: true,
+      batch: true,
+      student: true,
     },
   });
 };
@@ -111,23 +114,20 @@ export const deleteWeeklyMarksSheet = async (id: string) => {
   });
 };
 
-// Delete weekly marks sheets by section and/or class
-export const deleteWeeklyMarksSheetsBySectionAndClass = async (params: {
-  sectionId?: string;
-  stdClassId?: string;
+// Delete weekly marks sheets by class
+export const deleteWeeklyMarksSheetsByClass = async (params: {
+  stdClassId: string;
 }) => {
-  const { sectionId, stdClassId } = params;
-  if (!sectionId && !stdClassId) {
-    throw new Error("At least sectionId or stdClassId must be provided");
+  const { stdClassId } = params;
+  if (!stdClassId) {
+    throw new Error("stdClassId is required");
   }
-  const where: any = {};
-  if (sectionId) where.sectionId = sectionId;
-  if (stdClassId) where.stdClassId = stdClassId;
   try {
-    const result = await prisma.weeklyMarksSheet.deleteMany({ where });
+    const result = await prisma.weeklyMarksSheet.deleteMany({
+      where: { stdClassId },
+    });
     return result; // { count: number }
   } catch (error) {
-    // Optionally log or handle error
     throw error;
   }
 };
@@ -140,7 +140,6 @@ export const upsertStudentObtainedMarks = async (payload: {
   month: string;
   publishedDate: string;
   stdClassId: string;
-  sectionId: string;
   totalMarks: number;
   obtainedMarks: number;
 }) => {
@@ -153,7 +152,6 @@ export const upsertStudentObtainedMarks = async (payload: {
     "month",
     "publishedDate",
     "stdClassId",
-    "sectionId",
     "totalMarks",
     "obtainedMarks",
   ];
@@ -182,7 +180,6 @@ export const upsertStudentObtainedMarks = async (payload: {
       month: payload.month,
       publishedDate: payload.publishedDate,
       stdClassId: payload.stdClassId,
-      sectionId: payload.sectionId,
     },
     create: {
       studentId: payload.studentId,
@@ -192,7 +189,6 @@ export const upsertStudentObtainedMarks = async (payload: {
       month: payload.month,
       publishedDate: payload.publishedDate,
       stdClassId: payload.stdClassId,
-      sectionId: payload.sectionId,
       totalMarks: Number(payload.totalMarks),
       obtainedMarks: Number(payload.obtainedMarks),
     },
