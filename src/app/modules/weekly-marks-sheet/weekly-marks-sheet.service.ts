@@ -2,7 +2,7 @@ import prisma from "../../../db/db.config";
 import { builderQuery } from "../../builders/prismaBuilderQuery";
 
 export const createWeeklyMarksSheet = async (payload: any) => {
-  const { classId, stdClassId, subjectId, month, week, ...rest } = payload;
+  const { classId, stdClassId, batchId, subjectId, studentId, month, week, ...rest } = payload;
 
   const finalStdClassId = stdClassId || classId;
 
@@ -33,6 +33,8 @@ export const createWeeklyMarksSheet = async (payload: any) => {
       week,
       stdClass: { connect: { id: finalStdClassId } },
       subject: { connect: { id: subjectId } },
+      ...(batchId && { batch: { connect: { id: batchId } } }),
+      ...(studentId && { student: { connect: { id: studentId } } }),
     },
   });
 };
@@ -58,6 +60,8 @@ export const getAllWeeklyMarksSheets = async (query: Record<string, any>) => {
     include: {
       stdClass: true,
       subject: true,
+      batch: true,
+      student: true,
     },
   });
 
@@ -77,16 +81,19 @@ export const getWeeklyMarksSheetById = async (id: string) => {
     include: {
       stdClass: true,
       subject: true,
+      batch: true,
+      student: true,
     },
   });
 };
 
 export const updateWeeklyMarksSheet = async (id: string, payload: any) => {
-  const { classId, stdClassId, subjectId, studentId, ...rest } = payload;
+  const { classId, stdClassId, batchId, subjectId, studentId, ...rest } = payload;
   const finalStdClassId = stdClassId || classId;
   const updateData: any = { ...rest };
   if (finalStdClassId)
     updateData.stdClass = { connect: { id: finalStdClassId } };
+  if (batchId) updateData.batch = { connect: { id: batchId } };
   if (subjectId) updateData.subject = { connect: { id: subjectId } };
   if (studentId) updateData.student = { connect: { id: studentId } };
   return prisma.weeklyMarksSheet.update({
@@ -95,6 +102,8 @@ export const updateWeeklyMarksSheet = async (id: string, payload: any) => {
     include: {
       stdClass: true,
       subject: true,
+      batch: true,
+      student: true,
     },
   });
 };

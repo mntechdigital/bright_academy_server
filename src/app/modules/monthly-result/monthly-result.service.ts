@@ -55,6 +55,7 @@ const getAll = async (query: Record<string, any>) => {
           stdClass: true,
         },
       },
+      batch: true,
       results: true,
     },
   });
@@ -82,6 +83,7 @@ const getById = async (id: string) => {
           stdClass: true,
         },
       },
+      batch: true,
       results: true,
     },
   });

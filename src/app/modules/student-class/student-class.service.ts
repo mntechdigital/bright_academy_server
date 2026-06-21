@@ -43,6 +43,7 @@ const getAll = async (query: Record<string, any>) => {
   const response = await prisma.stdClass.findMany({
     ...studentClassQuery,
     include: {
+      batches: true,
       subjects: true,
       students: true,
       _count: {

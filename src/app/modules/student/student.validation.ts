@@ -4,6 +4,7 @@ const createStudentSchema = z.object({
   body: z.object({
     name: z.string({ required_error: 'Name is required' }).min(1, 'Name cannot be empty'),
     classId: z.string({ required_error: 'Class ID is required' }).min(1, 'Class ID cannot be empty'),
+    batchId: z.string().optional(),
     parentPhone: z.string({ required_error: 'Parent phone is required' }).min(1, 'Parent phone cannot be empty'),
     address: z.string({ required_error: 'Address is required' }).min(1, 'Address cannot be empty'),
     gender: z.string({ required_error: 'Gender is required' }).min(1, 'Gender cannot be empty'),
@@ -15,6 +16,7 @@ const updateStudentSchema = z.object({
   body: z.object({
     name: z.string().optional(),
     classId: z.string().optional(),
+    batchId: z.string().optional(),
     parentPhone: z.string().optional(),
     address: z.string().optional(),
     gender: z.string().optional(),
