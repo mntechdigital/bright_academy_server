@@ -5,6 +5,7 @@
   "main": "./dist/app.js",
   "scripts": {
     "build": "tsc",
+    "postinstall": "prisma generate",
     "start:prod": "node ./dist/app.js",
     "start:dev": "ts-node-dev --respawn --transpile-only ./src/app.ts",
     "lint": "eslint .",
