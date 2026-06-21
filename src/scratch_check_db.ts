@@ -5,7 +5,6 @@ async function main() {
   const students = await prisma.student.findMany({
     include: {
       stdClass: true,
-      section: true,
     }
   });
   console.log(`Found ${students.length} students:`);
@@ -17,7 +16,6 @@ async function main() {
       student: {
         include: {
           stdClass: true,
-          section: true,
         }
       }
     }
@@ -31,7 +29,6 @@ async function main() {
       student: {
         include: {
           stdClass: true,
-          section: true,
         }
       }
     }
