@@ -5,7 +5,7 @@ const formatThreeDigitNumber = (number: number) => String(number).padStart(3, '0
 
 export const seedTeachers = async () => {
   try {
-    for (let i = 1; i <= 30; i++) {
+    for (let i = 1; i <= 40; i++) {
       const suffix = formatThreeDigitNumber(i);
       const name = `teacher-${suffix}`;
       const regNo = `bright-${suffix}`;
