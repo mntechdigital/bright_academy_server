@@ -16,7 +16,7 @@ const getAll = async (query: Record<string, any>) => {
     searchFields: ['name', 'regNo'],
     searchTerm: query.searchTerm,
     filter: query.filter ? JSON.parse(query.filter) : {},
-    orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: 'asc' },
+    orderBy: query.orderBy ? JSON.parse(query.orderBy) : { regNo: 'asc' },
     page: query.page ? Number(query.page) : 1,
     limit: query.limit ? Number(query.limit) : 10,
   });
