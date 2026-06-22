@@ -54,6 +54,7 @@ const getById = async (id: string) => {
       id: true,
       name: true,
       regNo: true,
+      password: true,
       createdAt: true,
       updatedAt: true,
     },
