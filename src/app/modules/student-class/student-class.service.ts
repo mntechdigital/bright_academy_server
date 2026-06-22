@@ -32,7 +32,7 @@ const getAll = async (query: Record<string, any>) => {
     filter: query.filter ? JSON.parse(query.filter) : {},
     orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: 'asc' },
     page: query.page ? Number(query.page) : 1,
-    limit: query.limit ? Number(query.limit) : 10,
+    limit: query.limit ? Number(query.limit) : 100,
   });
 
   const totalStudentClasses = await prisma.stdClass.count({
