@@ -12,6 +12,18 @@ const create = async (payload: any) => {
     throw new AppError(404, `Class with ID ${payload.classId} does not exist`);
   }
 
+  // Check if subject already exists for this class
+  const existingSubject = await prisma.subject.findFirst({
+    where: {
+      classId: payload.classId,
+      subjectName: payload.subjectName,
+    },
+  });
+
+  if (existingSubject) {
+    throw new AppError(400, `Subject '${payload.subjectName}' already exists for this class`);
+  }
+
   return prisma.subject.create({
     data: {
       ...payload,

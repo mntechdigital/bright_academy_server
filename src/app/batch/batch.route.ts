@@ -1,8 +1,6 @@
 import { Router } from 'express';
 import { BatchValidation } from './batch.validation';
 import { batchController } from './batch.controller';
-import auth from '../middlewares/authorization';
-import { featureNames } from '../constant/seedRoleData';
 import validation from '../middlewares/validation';
 
 const router = Router();
