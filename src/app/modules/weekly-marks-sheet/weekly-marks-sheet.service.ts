@@ -109,6 +109,15 @@ export const updateWeeklyMarksSheet = async (id: string, payload: any) => {
 };
 
 export const deleteWeeklyMarksSheet = async (id: string) => {
+  // Check if record exists first
+  const existingRecord = await prisma.weeklyMarksSheet.findUnique({
+    where: { id },
+  });
+
+  if (!existingRecord) {
+    throw new Error("Weekly Marks Sheet not found");
+  }
+
   return prisma.weeklyMarksSheet.delete({
     where: { id },
   });
