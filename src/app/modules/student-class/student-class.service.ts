@@ -68,6 +68,7 @@ const getById = async (id: string) => {
     include: {
       subjects: true,
       students: true,
+      batches: true,
     },
   });
 };
