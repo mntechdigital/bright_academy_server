@@ -126,36 +126,37 @@ export const deleteWeeklyMarksSheet = async (id: string) => {
 // Delete weekly marks sheets by class, batch, and week
 export const deleteWeeklyMarksSheetsByClassAndBatch = async (params: {
   stdClassId: string;
-  batchId: string;
+  batchId?: string;
   week: string;
 }) => {
   const { stdClassId, batchId, week } = params;
-  if (!stdClassId || !batchId || !week) {
-    throw new Error("stdClassId, batchId, and week are required");
+  if (!stdClassId || !week) {
+    throw new Error("stdClassId and week are required");
   }
   try {
     console.log("Deleting weekly marks sheets with:", { stdClassId, batchId, week });
     
-    // First, check how many records match the exact combination
+    // Build where clause - always filter by stdClassId and week
+    const whereClause: any = { stdClassId, week };
+    
+    // If batchId is provided, delete records matching that batchId OR NULL batchId
+    // This handles both: records with correct batchId and old records with NULL batchId
+    if (batchId && batchId.trim() !== "") {
+      whereClause.OR = [
+        { batchId: batchId },
+        { batchId: null }
+      ];
+    }
+    // If batchId is not provided, delete ALL records for this class + week
+    
+    // First, check how many records match
     const countResult = await prisma.weeklyMarksSheet.count({
-      where: {
-        stdClassId,
-        batchId,
-        week,
-      },
+      where: whereClause,
     });
     console.log("Records to delete:", countResult);
     
-    if (countResult === 0) {
-      console.log("No records found with the given criteria. Check if batchId exists in database.");
-    }
-    
     const result = await prisma.weeklyMarksSheet.deleteMany({
-      where: {
-        stdClassId,
-        batchId,
-        week,
-      },
+      where: whereClause,
     });
     console.log("Deleted count:", result.count);
     return result; // { count: number }
