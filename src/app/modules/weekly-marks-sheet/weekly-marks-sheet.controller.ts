@@ -59,6 +59,8 @@ export const deleteWeeklyMarksSheetsByClass = catchAsync(async (req: Request, re
   const { stdClassId } = req.body;
   const result = await weeklyMarksSheetService.deleteWeeklyMarksSheetsByClassAndBatch({
     stdClassId: stdClassId as string,
+    batchId: req.body.batchId as string | undefined,
+    week: req.body.week as string | undefined,
   });
   sendResponse(res, {
     statusCode: 200,
