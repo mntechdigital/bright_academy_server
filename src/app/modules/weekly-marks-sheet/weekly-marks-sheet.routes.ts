@@ -7,7 +7,7 @@ router.post("/", weeklyMarksSheetController.createWeeklyMarksSheet);
 router.get("/", weeklyMarksSheetController.getAllWeeklyMarksSheets);
 
 // ✅ STATIC ROUTE আগে
-router.delete("/class", weeklyMarksSheetController.deleteWeeklyMarksSheetsByClass);
+router.delete("/class/batch", weeklyMarksSheetController.deleteWeeklyMarksSheetsByClass);
 router.post("/obtained-marks", weeklyMarksSheetController.upsertStudentObtainedMarks);
 
 // ✅ তারপর dynamic routes
