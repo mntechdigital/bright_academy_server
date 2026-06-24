@@ -123,17 +123,23 @@ export const deleteWeeklyMarksSheet = async (id: string) => {
   });
 };
 
-// Delete weekly marks sheets by class
-export const deleteWeeklyMarksSheetsByClass = async (params: {
+// Delete weekly marks sheets by class, batch, and week
+export const deleteWeeklyMarksSheetsByClassAndBatch = async (params: {
   stdClassId: string;
+  batchId?: string;
+  week?: string;
 }) => {
-  const { stdClassId } = params;
+  const { stdClassId, batchId, week } = params;
   if (!stdClassId) {
     throw new Error("stdClassId is required");
   }
   try {
+    const whereClause: any = { stdClassId };
+    if (batchId) whereClause.batchId = batchId;
+    if (week) whereClause.week = week;
+
     const result = await prisma.weeklyMarksSheet.deleteMany({
-      where: { stdClassId },
+      where: whereClause,
     });
     return result; // { count: number }
   } catch (error) {

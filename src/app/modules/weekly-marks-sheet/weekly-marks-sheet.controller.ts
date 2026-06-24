@@ -57,7 +57,7 @@ export const deleteWeeklyMarksSheet = catchAsync(async (req: Request, res: Respo
 // delete all weekly marks sheets by class
 export const deleteWeeklyMarksSheetsByClass = catchAsync(async (req: Request, res: Response) => {
   const { stdClassId } = req.body;
-  const result = await weeklyMarksSheetService.deleteWeeklyMarksSheetsByClass({
+  const result = await weeklyMarksSheetService.deleteWeeklyMarksSheetsByClassAndBatch({
     stdClassId: stdClassId as string,
   });
   sendResponse(res, {
