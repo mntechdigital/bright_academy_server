@@ -126,20 +126,20 @@ export const deleteWeeklyMarksSheet = async (id: string) => {
 // Delete weekly marks sheets by class, batch, and week
 export const deleteWeeklyMarksSheetsByClassAndBatch = async (params: {
   stdClassId: string;
-  batchId?: string;
-  week?: string;
+  batchId: string;
+  week: string;
 }) => {
   const { stdClassId, batchId, week } = params;
-  if (!stdClassId) {
-    throw new Error("stdClassId is required");
+  if (!stdClassId || !batchId || !week) {
+    throw new Error("stdClassId, batchId, and week are required");
   }
   try {
-    const whereClause: any = { stdClassId };
-    if (batchId) whereClause.batchId = batchId;
-    if (week) whereClause.week = week;
-
     const result = await prisma.weeklyMarksSheet.deleteMany({
-      where: whereClause,
+      where: {
+        stdClassId,
+        batchId,
+        week,
+      },
     });
     return result; // { count: number }
   } catch (error) {
