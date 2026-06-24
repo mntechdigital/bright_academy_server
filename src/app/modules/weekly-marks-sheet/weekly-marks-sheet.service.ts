@@ -136,7 +136,7 @@ export const deleteWeeklyMarksSheetsByClassAndBatch = async (params: {
   try {
     console.log("Deleting weekly marks sheets with:", { stdClassId, batchId, week });
     
-    // First, check how many records match
+    // First, check how many records match the exact combination
     const countResult = await prisma.weeklyMarksSheet.count({
       where: {
         stdClassId,
@@ -145,6 +145,10 @@ export const deleteWeeklyMarksSheetsByClassAndBatch = async (params: {
       },
     });
     console.log("Records to delete:", countResult);
+    
+    if (countResult === 0) {
+      console.log("No records found with the given criteria. Check if batchId exists in database.");
+    }
     
     const result = await prisma.weeklyMarksSheet.deleteMany({
       where: {

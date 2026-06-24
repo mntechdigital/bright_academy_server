@@ -57,6 +57,16 @@ export const deleteWeeklyMarksSheet = catchAsync(async (req: Request, res: Respo
 // delete all weekly marks sheets by class, batch, and week
 export const deleteWeeklyMarksSheetsByClass = catchAsync(async (req: Request, res: Response) => {
   const { stdClassId, batchId, week } = req.body;
+  
+  if (!stdClassId || !batchId || !week) {
+    return sendResponse(res, {
+      statusCode: 400,
+      success: false,
+      message: "stdClassId, batchId, and week are required",
+      data: null,
+    });
+  }
+  
   const result = await weeklyMarksSheetService.deleteWeeklyMarksSheetsByClassAndBatch({
     stdClassId: stdClassId as string,
     batchId: batchId as string,
