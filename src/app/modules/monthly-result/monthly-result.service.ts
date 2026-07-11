@@ -105,7 +105,10 @@ const update = async (id: string, payload: any) => {
         where: { id: result.id },
         data: {
           marks: result.marks,
+          fullMarks: result.fullMarks,
           highestMark: result.highestMark,
+          point: result.point,
+          grade: result.grade,
         },
       })),
     };
