@@ -83,6 +83,7 @@ model StdClass {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   weeklyMarksSheets WeeklyMarksSheet[]
+  monthlyExamResults MonthlyExamResult[]
 }
 
 model Subject {
@@ -150,6 +151,9 @@ model MonthlyExamResult {
 
   student   Student @relation(fields: [studentId], references: [id])
   studentId String
+
+  stdClass   StdClass @relation(fields: [classId], references: [id])
+  classId String
 
   batch   Batch? @relation(fields: [batchId], references: [id])
   batchId String?

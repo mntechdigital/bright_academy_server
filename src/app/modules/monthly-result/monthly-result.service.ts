@@ -33,22 +33,45 @@ const create = async (payload: any) => {
  * Get All Monthly Results
  */
 const getAll = async (query: Record<string, any>) => {
+  const parsedFilter = query.filter ? JSON.parse(query.filter) : {};
+
+  // batchId is pulled out and handled separately: some older MonthlyExamResult
+  // rows have a null batchId even though the student has one, so a plain
+  // `batchId: value` equality filter misses them. We instead match either the
+  // exam record's own batchId OR the related student's batchId.
+  const { batchId, ...restFilter } = parsedFilter;
+
   const monthlyResultQuery = builderQuery({
     searchFields: ['studentId','stdRegNo','parentPhone','name','batchId','classId','month'],
     searchTerm: query.searchTerm,
-    filter: query.filter ? JSON.parse(query.filter) : {},
+    filter: restFilter,
     orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: 'desc' },
     page: query.page ? Number(query.page) : 1,
     limit: query.limit ? Number(query.limit) : 10,
   });
 
+  const where = batchId
+    ? {
+        AND: [
+          monthlyResultQuery.where,
+          {
+            OR: [
+              { batchId },
+              { student: { batchId } },
+            ],
+          },
+        ],
+      }
+    : monthlyResultQuery.where;
+
   const totalMonthlyResults = await prisma.monthlyExamResult.count({
-    where: monthlyResultQuery.where,
+    where,
   });
   const currentPage = Number(query.page) || 1;
   const totalPages = Math.ceil(totalMonthlyResults / monthlyResultQuery.take);
   const response = await prisma.monthlyExamResult.findMany({
     ...monthlyResultQuery,
+    where,
     include: {
       student: {
         include: {
