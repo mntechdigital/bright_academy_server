@@ -34,7 +34,7 @@ const create = async (payload: any) => {
  */
 const getAll = async (query: Record<string, any>) => {
   const monthlyResultQuery = builderQuery({
-    searchFields: ['studentId','stdRegNo','parentPhone','name'],
+    searchFields: ['studentId','stdRegNo','parentPhone','name','batchId','classId','month'],
     searchTerm: query.searchTerm,
     filter: query.filter ? JSON.parse(query.filter) : {},
     orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: 'desc' },
