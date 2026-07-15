@@ -41,28 +41,42 @@ const getAll = async (query: Record<string, any>) => {
   // exam record's own batchId OR the related student's batchId.
   const { batchId, ...restFilter } = parsedFilter;
 
+  const searchTerm: string = query.searchTerm || '';
+
+  // stdRegNo / parentPhone / name are NOT columns on MonthlyExamResult itself —
+  // they live on the related Student model. Passing them into builderQuery's
+  // flat searchFields produced an invalid Prisma query (silently failing to
+  // "no results"). We build the nested search condition manually instead.
+  const searchCondition = searchTerm
+    ? {
+        OR: [
+          { month: { contains: searchTerm } },
+          { student: { stdRegNo: { contains: searchTerm } } },
+          { student: { name: { contains: searchTerm } } },
+          { student: { parentPhone: { contains: searchTerm } } },
+        ],
+      }
+    : null;
+
+  const batchCondition = batchId
+    ? { OR: [{ batchId }, { student: { batchId } }] }
+    : null;
+
   const monthlyResultQuery = builderQuery({
-    searchFields: ['studentId','stdRegNo','parentPhone','name','batchId','classId','month'],
-    searchTerm: query.searchTerm,
+    // searchFields intentionally left empty — search is handled above via searchCondition
+    searchFields: [],
+    searchTerm: '',
     filter: restFilter,
     orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: 'desc' },
     page: query.page ? Number(query.page) : 1,
     limit: query.limit ? Number(query.limit) : 10,
   });
 
-  const where = batchId
-    ? {
-        AND: [
-          monthlyResultQuery.where,
-          {
-            OR: [
-              { batchId },
-              { student: { batchId } },
-            ],
-          },
-        ],
-      }
-    : monthlyResultQuery.where;
+  const andConditions = [monthlyResultQuery.where, searchCondition, batchCondition].filter(
+    (c) => c !== null && Object.keys(c).length > 0,
+  );
+
+  const where = andConditions.length > 0 ? { AND: andConditions } : {};
 
   const totalMonthlyResults = await prisma.monthlyExamResult.count({
     where,
