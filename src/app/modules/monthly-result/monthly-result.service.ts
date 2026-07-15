@@ -1,6 +1,5 @@
-import prisma from '../../../db/db.config';
-import { builderQuery } from '../../builders/prismaBuilderQuery';
-
+import prisma from "../../../db/db.config";
+import { builderQuery } from "../../builders/prismaBuilderQuery";
 
 /**
  * Create Monthly Result
@@ -14,7 +13,9 @@ const create = async (payload: any) => {
   });
 
   if (existingResult) {
-    throw new Error('Monthly result already exists for this student in this month');
+    throw new Error(
+      "Monthly result already exists for this student in this month",
+    );
   }
 
   return prisma.monthlyExamResult.create({
@@ -28,7 +29,6 @@ const create = async (payload: any) => {
   });
 };
 
-
 /**
  * Get All Monthly Results
  */
@@ -41,7 +41,7 @@ const getAll = async (query: Record<string, any>) => {
   // exam record's own batchId OR the related student's batchId.
   const { batchId, ...restFilter } = parsedFilter;
 
-  const searchTerm: string = query.searchTerm || '';
+  const searchTerm: string = query.searchTerm || "";
 
   // stdRegNo / parentPhone / name are NOT columns on MonthlyExamResult itself —
   // they live on the related Student model. Passing them into builderQuery's
@@ -65,16 +65,18 @@ const getAll = async (query: Record<string, any>) => {
   const monthlyResultQuery = builderQuery({
     // searchFields intentionally left empty — search is handled above via searchCondition
     searchFields: [],
-    searchTerm: '',
+    searchTerm: "",
     filter: restFilter,
-    orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: 'desc' },
+    orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: "desc" },
     page: query.page ? Number(query.page) : 1,
     limit: query.limit ? Number(query.limit) : 10,
   });
 
-  const andConditions = [monthlyResultQuery.where, searchCondition, batchCondition].filter(
-    (c) => c !== null && Object.keys(c).length > 0,
-  );
+  const andConditions = [
+    monthlyResultQuery.where,
+    searchCondition,
+    batchCondition,
+  ].filter((c) => c !== null && Object.keys(c).length > 0);
 
   const where = andConditions.length > 0 ? { AND: andConditions } : {};
 
@@ -107,7 +109,6 @@ const getAll = async (query: Record<string, any>) => {
   };
 };
 
-
 /**
  * Get Single Monthly Result
  */
@@ -125,7 +126,6 @@ const getById = async (id: string) => {
     },
   });
 };
-
 
 /**
  * Update Monthly Result
@@ -164,7 +164,6 @@ const update = async (id: string, payload: any) => {
   });
 };
 
-
 /**
  * Delete Monthly Result
  */
@@ -174,6 +173,69 @@ const remove = async (id: string) => {
   });
 };
 
+/**
+ * Calculate positions for all students in a class (optionally scoped to a month)
+ */
+const calculatePositionsByClass = async (classId: string, month?: string) => {
+  if (!classId) {
+    throw new Error("classId is required to calculate positions");
+  }
+
+  const where: any = {
+    student: { classId },
+  };
+  if (month) {
+    where.month = month;
+  }
+
+  // সেই ক্লাসের (ও প্রয়োজনে সেই মাসের) সব রেজাল্ট — pagination ছাড়া
+  const allResults = await prisma.monthlyExamResult.findMany({
+    where,
+    include: {
+      student: true,
+      results: true,
+    },
+  });
+
+  if (allResults.length === 0) {
+    return { classId, month: month || null, totalStudents: 0, updated: [] };
+  }
+
+  const getAchievedMarks = (results: { marks: number }[]) =>
+    results.reduce((sum, r) => sum + r.marks, 0);
+
+  const getOrdinalSuffix = (n: number) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return s[(v - 20) % 10] || s[v] || s[0];
+  };
+
+  // Achieved marks অনুযায়ী descending sort
+  const sorted = [...allResults].sort(
+    (a, b) => getAchievedMarks(b.results) - getAchievedMarks(a.results),
+  );
+
+  // সব আপডেট একটা transaction-এ — atomic (সব হবে, নয়তো কিছুই হবে না)
+  const updates = sorted.map((result, index) =>
+    prisma.monthlyExamResult.update({
+      where: { id: result.id },
+      data: { position: `${index + 1}${getOrdinalSuffix(index + 1)}` },
+    }),
+  );
+
+  await prisma.$transaction(updates);
+
+  return {
+    classId,
+    month: month || null,
+    totalStudents: sorted.length,
+    updated: sorted.map((r, i) => ({
+      id: r.id,
+      studentName: r.student?.name,
+      position: `${i + 1}${getOrdinalSuffix(i + 1)}`,
+    })),
+  };
+};
 
 export const monthlyResultService = {
   create,
@@ -181,4 +243,5 @@ export const monthlyResultService = {
   getById,
   update,
   delete: remove,
+  calculatePositionsByClass, // 👈 যোগ করুন
 };

@@ -1,5 +1,12 @@
 import express from 'express';
-import { createMonthlyResult, getAllMonthlyResults, updateMonthlyResult, deleteMonthlyResult, getSingleMonthlyResult } from './monthly-result.controller';
+import {
+  createMonthlyResult,
+  getAllMonthlyResults,
+  updateMonthlyResult,
+  deleteMonthlyResult,
+  getSingleMonthlyResult,
+  calculatePositions, // 👈 import করুন
+} from './monthly-result.controller';
 import { validateMonthlyResult } from './monthly-result.validation';
 import validation from '../../middlewares/validation';
 
@@ -7,6 +14,7 @@ const router = express.Router();
 
 router.post('/', createMonthlyResult);
 router.get('/', getAllMonthlyResults);
+router.post('/calculate-positions', calculatePositions);
 router.get('/:id', getSingleMonthlyResult);
 router.patch('/:id', updateMonthlyResult);
 router.delete('/:id', deleteMonthlyResult);

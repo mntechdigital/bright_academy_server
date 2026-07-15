@@ -65,3 +65,21 @@ export const deleteMonthlyResult = catchAsync(
     });
   },
 );
+
+export const calculatePositions = catchAsync(
+  async (req: Request, res: Response) => {
+    const { classId, month } = req.body;
+
+    const result = await monthlyResultService.calculatePositionsByClass(
+      classId,
+      month,
+    );
+
+    sendResponse(res, {
+      statusCode: 200,
+      success: true,
+      message: 'Positions calculated successfully',
+      data: result,
+    });
+  },
+);
