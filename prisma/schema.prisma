@@ -148,7 +148,7 @@ model WeeklyMarksSheet {
 
 model MonthlyExamResult {
   id String @id @default(uuid())
-
+  monthlyExamName String?
   student   Student @relation(fields: [studentId], references: [id])
   studentId String
 
