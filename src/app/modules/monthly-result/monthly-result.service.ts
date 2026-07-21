@@ -14,16 +14,55 @@ const create = async (payload: any) => {
 
   if (existingResult) {
     throw new Error(
-      "Monthly result already exists for this student in this month",
+      "Monthly result already exists for this student in this month"
     );
   }
 
+  const { studentId, results, ...restPayload } = payload;
+
+  // Get student's class & batch automatically
+  const student = await prisma.student.findUniqueOrThrow({
+    where: {
+      id: studentId,
+    },
+    select: {
+      classId: true,
+      batchId: true,
+    },
+  });
+
   return prisma.monthlyExamResult.create({
     data: {
-      ...payload,
+      ...restPayload,
+
+      student: {
+        connect: {
+          id: studentId,
+        },
+      },
+
+      stdClass: {
+        connect: {
+          id: student.classId,
+        },
+      },
+
+      ...(student.batchId && {
+        batch: {
+          connect: {
+            id: student.batchId,
+          },
+        },
+      }),
+
+      results: {
+        create: results,
+      },
     },
+
     include: {
       student: true,
+      batch: true,
       results: true,
     },
   });
