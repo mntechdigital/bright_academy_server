@@ -12,19 +12,21 @@ export const createWeeklyMarksSheet = async (payload: any) => {
     );
   }
 
-  // Check if record with same subject, month, week, and batch already exists
+  // Check if record with same student, subject, week, year, and batch already exists
+  // This matches the unique constraint: @@unique([studentId, subjectId, week, year])
   const existing = await prisma.weeklyMarksSheet.findFirst({
     where: {
+      studentId: studentId || null,
       subjectId,
-      month,
       week,
+      year: payload.year,
       stdClassId: finalStdClassId,
-      batchId: batchId || null, // Match both provided batchId and NULL
+      batchId: batchId || null,
     },
   });
 
   if (existing) {
-    throw new Error("Record with same subject, month, week, and batch already exists");
+    throw new Error("Record with same student, subject, week, year, and batch already exists");
   }
 
   return prisma.weeklyMarksSheet.create({
