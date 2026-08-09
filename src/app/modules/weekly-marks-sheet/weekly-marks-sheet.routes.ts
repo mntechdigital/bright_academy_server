@@ -11,6 +11,10 @@ router.delete("/class/batch", weeklyMarksSheetController.deleteWeeklyMarksSheets
 router.post("/obtained-marks", weeklyMarksSheetController.upsertStudentObtainedMarks);
 router.post("/bulk-obtained-marks", weeklyMarksSheetController.bulkUpsertStudentMarks);
 
+// Get weekly marks by filters (class, batch, subject, week, month, year)
+// This returns only the selected week's data
+router.get("/filter", weeklyMarksSheetController.getWeeklyMarksSheetsByFilters);
+
 // ✅ তারপর dynamic routes (specific routes before generic routes)
 router.get("/student/:studentId", weeklyMarksSheetController.getWeeklyMarksSheetsByStudent);
 router.get("/:id", weeklyMarksSheetController.getWeeklyMarksSheetById);
