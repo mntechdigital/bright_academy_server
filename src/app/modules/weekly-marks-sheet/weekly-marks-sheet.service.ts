@@ -90,6 +90,24 @@ export const getWeeklyMarksSheetById = async (id: string) => {
   });
 };
 
+// Get all weekly marks sheets for a specific student
+export const getWeeklyMarksSheetsByStudent = async (studentId: string) => {
+  return prisma.weeklyMarksSheet.findMany({
+    where: {
+      studentId: studentId,
+    },
+    include: {
+      stdClass: true,
+      subject: true,
+      batch: true,
+      student: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+};
+
 export const updateWeeklyMarksSheet = async (id: string, payload: any) => {
   const { classId, stdClassId, batchId, subjectId, studentId, ...rest } = payload;
   const finalStdClassId = stdClassId || classId;
@@ -177,6 +195,7 @@ export const upsertStudentObtainedMarks = async (payload: {
   month: string;
   publishedDate: string;
   stdClassId: string;
+  batchId?: string;
   totalMarks: number;
   obtainedMarks: number;
 }) => {
@@ -202,32 +221,85 @@ export const upsertStudentObtainedMarks = async (payload: {
   }
 
   // Upsert: update if exists, otherwise create
-  return prisma.weeklyMarksSheet.upsert({
+  // First, try to find existing record
+  const existing = await prisma.weeklyMarksSheet.findFirst({
     where: {
-      studentId_subjectId_week_year: {
-        studentId: payload.studentId,
-        subjectId: payload.subjectId,
-        week: payload.week,
-        year: payload.year,
-      },
-    },
-    update: {
-      obtainedMarks: Number(payload.obtainedMarks),
-      totalMarks: Number(payload.totalMarks),
-      month: payload.month,
-      publishedDate: payload.publishedDate,
-      stdClassId: payload.stdClassId,
-    },
-    create: {
       studentId: payload.studentId,
       subjectId: payload.subjectId,
       week: payload.week,
       year: payload.year,
-      month: payload.month,
-      publishedDate: payload.publishedDate,
       stdClassId: payload.stdClassId,
-      totalMarks: Number(payload.totalMarks),
-      obtainedMarks: Number(payload.obtainedMarks),
+      batchId: payload.batchId || null,
     },
   });
+
+  if (existing) {
+    // Update existing record
+    return prisma.weeklyMarksSheet.update({
+      where: { id: existing.id },
+      data: {
+        obtainedMarks: Number(payload.obtainedMarks),
+        totalMarks: Number(payload.totalMarks),
+        month: payload.month,
+        publishedDate: payload.publishedDate,
+      },
+    });
+  } else {
+    // Create new record
+    return prisma.weeklyMarksSheet.create({
+      data: {
+        studentId: payload.studentId,
+        subjectId: payload.subjectId,
+        week: payload.week,
+        year: payload.year,
+        month: payload.month,
+        publishedDate: payload.publishedDate,
+        stdClassId: payload.stdClassId,
+        batchId: payload.batchId || null,
+        totalMarks: Number(payload.totalMarks),
+        obtainedMarks: Number(payload.obtainedMarks),
+      },
+    });
+  }
+};
+
+// Bulk upsert multiple student marks at once
+export const bulkUpsertStudentMarks = async (payload: {
+  marks: Array<{
+    studentId: string;
+    subjectId: string;
+    week: string;
+    year: string;
+    month: string;
+    publishedDate: string;
+    stdClassId: string;
+    batchId?: string;
+    totalMarks: number;
+    obtainedMarks: number;
+  }>;
+}) => {
+  if (!payload.marks || !Array.isArray(payload.marks) || payload.marks.length === 0) {
+    throw new Error("Marks array is required and must not be empty");
+  }
+
+  const results = [];
+  
+  // Process each mark entry
+  for (const mark of payload.marks) {
+    try {
+      const result = await upsertStudentObtainedMarks(mark);
+      results.push(result);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error(`Error processing mark for student ${mark.studentId}:`, errorMessage);
+      // Continue processing other marks even if one fails
+      results.push({ error: errorMessage, studentId: mark.studentId });
+    }
+  }
+
+  return {
+    success: true,
+    totalProcessed: results.length,
+    results,
+  };
 };
