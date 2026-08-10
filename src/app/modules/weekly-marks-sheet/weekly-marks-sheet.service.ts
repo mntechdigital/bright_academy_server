@@ -2,7 +2,16 @@ import prisma from "../../../db/db.config";
 import { builderQuery } from "../../builders/prismaBuilderQuery";
 
 export const createWeeklyMarksSheet = async (payload: any) => {
-  const { classId, stdClassId, batchId, subjectId, studentId, month, week, ...rest } = payload;
+  const {
+    classId,
+    stdClassId,
+    batchId,
+    subjectId,
+    studentId,
+    month,
+    week,
+    ...rest
+  } = payload;
 
   const finalStdClassId = stdClassId || classId;
 
@@ -12,19 +21,23 @@ export const createWeeklyMarksSheet = async (payload: any) => {
     );
   }
 
-  // Check if record with same subject, month, week, and batch already exists
+  // Check if record with same student, subject, week, year, and batch already exists
+  // This matches the unique constraint: @@unique([studentId, subjectId, week, year])
   const existing = await prisma.weeklyMarksSheet.findFirst({
     where: {
+      studentId: studentId || null,
       subjectId,
-      month,
       week,
+      year: payload.year,
       stdClassId: finalStdClassId,
-      batchId: batchId || null, // Match both provided batchId and NULL
+      batchId: batchId || null,
     },
   });
 
   if (existing) {
-    throw new Error("Record with same subject, month, week, and batch already exists");
+    throw new Error(
+      "Record with same student, subject, week, year, and batch already exists",
+    );
   }
 
   return prisma.weeklyMarksSheet.create({
@@ -47,7 +60,7 @@ export const getAllWeeklyMarksSheets = async (query: Record<string, any>) => {
     filter: query.filter ? JSON.parse(query.filter) : {},
     orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: "desc" },
     page: query.page ? Number(query.page) : 1,
-    limit: query.limit ? Number(query.limit) : 10,
+    limit: query.limit ? Number(query.limit) : 1000000,
   });
 
   const totalItems = await prisma.weeklyMarksSheet.count({
@@ -88,8 +101,27 @@ export const getWeeklyMarksSheetById = async (id: string) => {
   });
 };
 
+// Get all weekly marks sheets for a specific student
+export const getWeeklyMarksSheetsByStudent = async (studentId: string) => {
+  return prisma.weeklyMarksSheet.findMany({
+    where: {
+      studentId: studentId,
+    },
+    include: {
+      stdClass: true,
+      subject: true,
+      batch: true,
+      student: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+};
+
 export const updateWeeklyMarksSheet = async (id: string, payload: any) => {
-  const { classId, stdClassId, batchId, subjectId, studentId, ...rest } = payload;
+  const { classId, stdClassId, batchId, subjectId, studentId, ...rest } =
+    payload;
   const finalStdClassId = stdClassId || classId;
   const updateData: any = { ...rest };
   if (finalStdClassId)
@@ -135,27 +167,28 @@ export const deleteWeeklyMarksSheetsByClassAndBatch = async (params: {
     throw new Error("stdClassId and week are required");
   }
   try {
-    console.log("Deleting weekly marks sheets with:", { stdClassId, batchId, week });
-    
+    console.log("Deleting weekly marks sheets with:", {
+      stdClassId,
+      batchId,
+      week,
+    });
+
     // Build where clause - always filter by stdClassId and week
     const whereClause: any = { stdClassId, week };
-    
+
     // If batchId is provided, delete records matching that batchId OR NULL batchId
     // This handles both: records with correct batchId and old records with NULL batchId
     if (batchId && batchId.trim() !== "") {
-      whereClause.OR = [
-        { batchId: batchId },
-        { batchId: null }
-      ];
+      whereClause.OR = [{ batchId: batchId }, { batchId: null }];
     }
     // If batchId is not provided, delete ALL records for this class + week
-    
+
     // First, check how many records match
     const countResult = await prisma.weeklyMarksSheet.count({
       where: whereClause,
     });
     console.log("Records to delete:", countResult);
-    
+
     const result = await prisma.weeklyMarksSheet.deleteMany({
       where: whereClause,
     });
@@ -167,6 +200,61 @@ export const deleteWeeklyMarksSheetsByClassAndBatch = async (params: {
   }
 };
 
+// Get weekly marks sheets by class, batch, subject, and specific week
+// This returns only the selected week's data, not all weeks
+// Get weekly marks sheets by class, batch, subject, and specific week
+export const getWeeklyMarksSheetsByFilters = async (params: {
+  stdClassId: string;
+  batchId?: string;
+  subjectId: string;
+  week?: string;
+  month?: string;
+  year?: string;
+}) => {
+  const { stdClassId, batchId, subjectId, week, month, year } = params;
+
+  const whereClause: any = {
+    stdClassId: String(stdClassId),
+    subjectId: String(subjectId),
+  };
+
+  if (week) {
+    whereClause.week = String(week);
+  }
+
+  if (month) {
+    whereClause.month = String(month);
+  }
+
+  if (year) {
+    whereClause.year = String(year);
+  }
+
+  // IMPORTANT FIX
+  if (batchId && batchId.trim() !== "") {
+    whereClause.batchId = String(batchId);
+  }
+
+  console.log("FILTER WHERE =>", whereClause);
+
+  const result = await prisma.weeklyMarksSheet.findMany({
+    where: whereClause,
+    include: {
+      stdClass: true,
+      subject: true,
+      batch: true,
+      student: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+
+  console.log("FILTER RESULT COUNT =>", result.length);
+
+  return result;
+};
+
 export const upsertStudentObtainedMarks = async (payload: {
   studentId: string;
   subjectId: string;
@@ -175,6 +263,7 @@ export const upsertStudentObtainedMarks = async (payload: {
   month: string;
   publishedDate: string;
   stdClassId: string;
+  batchId?: string;
   totalMarks: number;
   obtainedMarks: number;
 }) => {
@@ -200,32 +289,93 @@ export const upsertStudentObtainedMarks = async (payload: {
   }
 
   // Upsert: update if exists, otherwise create
-  return prisma.weeklyMarksSheet.upsert({
+  // First, try to find existing record
+  const existing = await prisma.weeklyMarksSheet.findFirst({
     where: {
-      studentId_subjectId_week_year: {
-        studentId: payload.studentId,
-        subjectId: payload.subjectId,
-        week: payload.week,
-        year: payload.year,
-      },
-    },
-    update: {
-      obtainedMarks: Number(payload.obtainedMarks),
-      totalMarks: Number(payload.totalMarks),
-      month: payload.month,
-      publishedDate: payload.publishedDate,
-      stdClassId: payload.stdClassId,
-    },
-    create: {
       studentId: payload.studentId,
       subjectId: payload.subjectId,
       week: payload.week,
       year: payload.year,
-      month: payload.month,
-      publishedDate: payload.publishedDate,
       stdClassId: payload.stdClassId,
-      totalMarks: Number(payload.totalMarks),
-      obtainedMarks: Number(payload.obtainedMarks),
+      batchId: payload.batchId || null,
     },
   });
+
+  if (existing) {
+    // Update existing record
+    return prisma.weeklyMarksSheet.update({
+      where: { id: existing.id },
+      data: {
+        obtainedMarks: Number(payload.obtainedMarks),
+        totalMarks: Number(payload.totalMarks),
+        month: payload.month,
+        publishedDate: payload.publishedDate,
+      },
+    });
+  } else {
+    // Create new record
+    return prisma.weeklyMarksSheet.create({
+      data: {
+        studentId: payload.studentId,
+        subjectId: payload.subjectId,
+        week: payload.week,
+        year: payload.year,
+        month: payload.month,
+        publishedDate: payload.publishedDate,
+        stdClassId: payload.stdClassId,
+        batchId: payload.batchId || null,
+        totalMarks: Number(payload.totalMarks),
+        obtainedMarks: Number(payload.obtainedMarks),
+      },
+    });
+  }
+};
+
+// Bulk upsert multiple student marks at once
+export const bulkUpsertStudentMarks = async (payload: {
+  marks: Array<{
+    studentId: string;
+    subjectId: string;
+    week: string;
+    year: string;
+    month: string;
+    publishedDate: string;
+    stdClassId: string;
+    batchId?: string;
+    totalMarks: number;
+    obtainedMarks: number;
+  }>;
+}) => {
+  if (
+    !payload.marks ||
+    !Array.isArray(payload.marks) ||
+    payload.marks.length === 0
+  ) {
+    throw new Error("Marks array is required and must not be empty");
+  }
+
+  const results = [];
+
+  // Process each mark entry
+  for (const mark of payload.marks) {
+    try {
+      const result = await upsertStudentObtainedMarks(mark);
+      results.push(result);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      console.error(
+        `Error processing mark for student ${mark.studentId}:`,
+        errorMessage,
+      );
+      // Continue processing other marks even if one fails
+      results.push({ error: errorMessage, studentId: mark.studentId });
+    }
+  }
+
+  return {
+    success: true,
+    totalProcessed: results.length,
+    results,
+  };
 };

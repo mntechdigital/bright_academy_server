@@ -33,6 +33,18 @@ export const getWeeklyMarksSheetById = catchAsync(async (req: Request, res: Resp
   });
 });
 
+// Get all weekly marks sheets for a specific student
+export const getWeeklyMarksSheetsByStudent = catchAsync(async (req: Request, res: Response) => {
+  const studentId = req.params.studentId as string;
+  const result = await weeklyMarksSheetService.getWeeklyMarksSheetsByStudent(studentId);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Student weekly marks fetched successfully",
+    data: result,
+  });
+});
+
 export const updateWeeklyMarksSheet = catchAsync(async (req: Request, res: Response) => {
   const result = await weeklyMarksSheetService.updateWeeklyMarksSheet(req.params.id as string, req.body);
   sendResponse(res, {
@@ -87,6 +99,48 @@ export const upsertStudentObtainedMarks = catchAsync(async (req: Request, res: R
     statusCode: 201,
     success: true,
     message: "Obtained marks saved/updated successfully",
+    data: result,
+  });
+});
+
+// Bulk upsert multiple student marks
+export const bulkUpsertStudentMarks = catchAsync(async (req: Request, res: Response) => {
+  const result = await weeklyMarksSheetService.bulkUpsertStudentMarks(req.body);
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: `Successfully processed ${result.totalProcessed} marks`,
+    data: result,
+  });
+});
+
+// Get weekly marks sheets by filters (class, batch, subject, week, month, year)
+// This returns only the selected week's data
+export const getWeeklyMarksSheetsByFilters = catchAsync(async (req: Request, res: Response) => {
+  const { stdClassId, batchId, subjectId, week, month, year } = req.query;
+  
+  if (!stdClassId || !subjectId) {
+    return sendResponse(res, {
+      statusCode: 400,
+      success: false,
+      message: "stdClassId and subjectId are required",
+      data: null,
+    });
+  }
+  
+  const result = await weeklyMarksSheetService.getWeeklyMarksSheetsByFilters({
+    stdClassId: stdClassId as string,
+    batchId: batchId as string | undefined,
+    subjectId: subjectId as string,
+    week: week as string | undefined,
+    month: month as string | undefined,
+    year: year as string | undefined,
+  });
+  
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Weekly marks sheets fetched successfully",
     data: result,
   });
 });

@@ -143,12 +143,12 @@ model WeeklyMarksSheet {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([studentId, subjectId, week, year])
+  @@unique([stdClassId, batchId, subjectId, studentId, week, year])
 }
 
 model MonthlyExamResult {
   id String @id @default(uuid())
-
+  monthlyExamName String?
   student   Student @relation(fields: [studentId], references: [id])
   studentId String
 
