@@ -379,3 +379,96 @@ export const bulkUpsertStudentMarks = async (payload: {
     results,
   };
 };
+
+const getMeritPosition = async ({
+  classId,
+  week,
+  month,
+  year,
+  studentId,
+}: {
+  classId: string;
+  week: string;
+  month: string;
+  year: string;
+  studentId: string;
+}) => {
+  console.log('🔥 getMeritPosition function called 🔥');
+  console.log("REQUEST:", {
+    classId,
+    week,
+    month,
+    year,
+    studentId,
+  });
+
+  // Week normalize: Week 1 / Week-1 => 1
+  const requestedWeek = week.replace(/Week[- ]?/i, "").trim();
+
+  // একই class + month + year এর সব marks আনো
+  const marks = await prisma.weeklyMarksSheet.findMany({
+    where: {
+      stdClassId: classId,
+      month,
+      year,
+    },
+    select: {
+      studentId: true,
+      obtainedMarks: true,
+      week: true,
+    },
+  });
+
+  console.log("ALL MARKS COUNT:", marks.length);
+  console.log("ALL MARKS:", marks);
+
+  // Requested week অনুযায়ী filter
+  const filteredMarks = marks.filter((m) => {
+    const dbWeek = m.week.replace(/Week[- ]?/i, "").trim();
+    return dbWeek === requestedWeek;
+  });
+
+  console.log("FILTERED MARKS COUNT:", filteredMarks.length);
+  console.log("FILTERED MARKS:", filteredMarks);
+
+  // প্রতিটি student এর total marks বের করা
+  const totalMap: Record<string, number> = {};
+
+  filteredMarks.forEach((mark) => {
+    if (mark.studentId && mark.obtainedMarks !== null) {
+      totalMap[mark.studentId] =
+        (totalMap[mark.studentId] || 0) + mark.obtainedMarks;
+    }
+  });
+
+  console.log("TOTAL MAP:", totalMap);
+
+  // array বানানো
+  const totals = Object.entries(totalMap).map(([id, total]) => ({
+    studentId: id,
+    totalMarks: total,
+  }));
+
+  // বেশি নম্বর আগে
+  totals.sort((a, b) => b.totalMarks - a.totalMarks);
+
+  // rank assign
+  const ranked = totals.map((item, index) => ({
+    ...item,
+    position: index + 1,
+  }));
+
+  console.log("RANKED:", ranked);
+
+  // নির্দিষ্ট student এর rank বের করা
+  const studentRank = ranked.find((r) => r.studentId === studentId);
+
+  console.log("REQUEST STUDENT ID:", studentId);
+  console.log("FOUND RANK:", studentRank);
+
+  return studentRank || null;
+};
+
+export const WeeklyMarksService = {
+  getMeritPosition,
+};

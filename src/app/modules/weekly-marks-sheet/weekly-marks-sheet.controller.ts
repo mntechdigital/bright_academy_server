@@ -144,3 +144,34 @@ export const getWeeklyMarksSheetsByFilters = catchAsync(async (req: Request, res
     data: result,
   });
 });
+
+
+export const getMeritPosition = async (req: Request, res: Response) => {
+  console.log('🔥🔥🔥 CONTROLLER HIT 🔥🔥🔥');
+  try {
+    const { classId, week, month, year, studentId } = req.query;
+
+    const result = await weeklyMarksSheetService.WeeklyMarksService.getMeritPosition({
+      classId: classId as string,
+      week: week as string,
+      month: month as string,
+      year: year as string,
+      studentId: studentId as string,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Merit position retrieved successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const WeeklyMarksController = {
+  getMeritPosition,
+};
