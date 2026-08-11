@@ -74,6 +74,45 @@ const getMyResults = catchAsync(async (req, res) => {
   });
 });
 
+
+
+import { Request, Response } from 'express';
+import * as weeklyMarksSheetService from '../weekly-marks-sheet/weekly-marks-sheet.service';
+
+// Merit Position Controller
+const getMeritPosition = async (req: Request, res: Response) => {
+  console.log('🔥 MERIT CONTROLLER HIT 🔥');
+
+  try {
+    const { classId, week, month, year, studentId } = req.query;
+
+    const result =
+      await weeklyMarksSheetService.WeeklyMarksService.getMeritPosition({
+        classId: classId as string,
+        week: week as string,
+        month: month as string,
+        year: year as string,
+        studentId: studentId as string,
+      });
+
+    console.log('🔥 MERIT RESULT:', result);
+
+    res.status(200).json({
+      success: true,
+      message: 'Merit position retrieved successfully',
+      data: result,
+    });
+  } catch (error: any) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
 export const studentController = {
 	createStudent,
 	getAllStudents,
@@ -82,4 +121,6 @@ export const studentController = {
 	deleteStudent,
 	loginStudent, // ✅
 	getMyResults, // ✅
+	
+  getMeritPosition,
 };

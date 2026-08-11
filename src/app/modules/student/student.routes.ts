@@ -1,3 +1,4 @@
+
 import { Router } from 'express';
 import auth from '../../middlewares/authorization';
 import { featureNames } from '../../constant/seedRoleData';
@@ -17,7 +18,7 @@ router.post(
 
 router.get('/', studentController.getAllStudents);
 
-// Public route — login (specific path, must stay above any '/:id' route)
+// Public route — login
 router.post(
   '/login',
   validation(StudentValidation.loginSchema),
@@ -25,9 +26,14 @@ router.post(
 );
 
 // Protected route — show own results
-// ✅ studentAuth() কল করা হয়েছে (factory function ছিল)
-// ✅ '/:id' রুটের আগে রাখা হয়েছে, নাহলে Express এটাকে id="my-results" ধরে নিত
 router.get('/my-results', studentAuth(), studentController.getMyResults);
+
+// ✅ ADD THIS ROUTE
+router.get(
+  '/merit-position',
+  studentAuth(),
+  studentController.getMeritPosition,
+);
 
 router.put(
   '/:id',
@@ -42,8 +48,8 @@ router.delete(
   studentController.deleteStudent,
 );
 
-// ⚠️ Dynamic param route গুলো (':id') সবসময় সবার নিচে রাখুন,
-// নাহলে এগুলো '/login', '/my-results' এর মতো specific path গুলোকে আগেই ম্যাচ করে নিবে
+// Dynamic route always at bottom
 router.get('/:id', studentController.getStudentById);
 
 export const StudentRoutes = router;
+
