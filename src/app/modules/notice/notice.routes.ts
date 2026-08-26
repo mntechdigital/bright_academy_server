@@ -1,13 +1,12 @@
 import { Router } from 'express';
-import validation from '../../middlewares/validation';
-import { NoticeValidation } from './notice.validation';
+import { pdfUpload } from '../../middlewares/multer';
 import { noticeController } from './notice.controller';
 
 const router = Router();
 
 router.post(
   '/',
-  validation(NoticeValidation.createNoticeSchema),
+  pdfUpload.single('pdf'),
   noticeController.createNotice,
 );
 
@@ -15,11 +14,13 @@ router.get('/', noticeController.getAllNotices);
 
 router.get('/published', noticeController.getPublishedNotices);
 
+router.get('/:id/pdf', noticeController.getNoticePdf);
+
 router.get('/:id', noticeController.getNoticeById);
 
 router.patch(
   '/:id',
-  validation(NoticeValidation.updateNoticeSchema),
+  pdfUpload.single('pdf'),
   noticeController.updateNotice,
 );
 

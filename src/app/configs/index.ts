@@ -18,4 +18,7 @@ export default {
   adminPass: process.env.ADMIN_PASS,
   adminFullName: process.env.ADMIN_FULLNAME,
   password_salt_rounds: 10,
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
 };
