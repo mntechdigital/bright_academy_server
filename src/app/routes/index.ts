@@ -9,6 +9,7 @@ import WeeklyMarksSheetRoutes from "../modules/weekly-marks-sheet/weekly-marks-s
 import { MonthlyResultRoutes } from "../modules/monthly-result/monthly-result.routes";
 import { TeacherRoutes } from '../modules/teacher/teacher.routes';
 import { BatchRoutes } from "../batch/batch.route";
+import { NoticeRoutes } from "../modules/notice/notice.routes";
 
 const router = Router();
 
@@ -52,6 +53,10 @@ const moduleRoutes: TModuleRoute[] = [
   {
     path: "/batches",
     route: BatchRoutes,
+  },
+  {
+    path: "/notices",
+    route: NoticeRoutes,
   }
 ];
 

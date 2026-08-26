@@ -154,77 +154,6 @@ const deleteStudent = async (id: string) => {
   return prisma.student.delete({ where: { id } });
 };
 
-const getMeritPosition = async ({
-  classId,
-  week,
-  month,
-  year,
-  studentId,
-}: {
-  classId: string;
-  week: string;
-  month: string;
-  year: string;
-  studentId: string;
-}) => {
-  console.log('🔥 SERVICE CALLED 🔥');
-
-  // Normalize week (Week 1 / Week-1 => 1)
-  const requestedWeek = week.replace(/Week[- ]?/i, '').trim();
-
-  const marks = await prisma.weeklyMarksSheet.findMany({
-    where: {
-      stdClassId: classId,
-      month,
-      year,
-    },
-    select: {
-      studentId: true,
-      obtainedMarks: true,
-      week: true,
-    },
-  });
-
-  // Filter requested week
-  const filteredMarks = marks.filter((m) => {
-    const dbWeek = m.week.replace(/Week[- ]?/i, '').trim();
-    return dbWeek === requestedWeek;
-  });
-
-  // Calculate totals
-  const totalMap: Record<string, number> = {};
-
-  filteredMarks.forEach((mark) => {
-    if (mark.studentId && mark.obtainedMarks !== null) {
-      totalMap[mark.studentId] =
-        (totalMap[mark.studentId] || 0) + mark.obtainedMarks;
-    }
-  });
-
-  // Create array
-  const totals = Object.entries(totalMap).map(([id, total]) => ({
-    studentId: id,
-    totalMarks: total,
-  }));
-
-  // Sort descending
-  totals.sort((a, b) => b.totalMarks - a.totalMarks);
-
-  // Assign rank
-  const ranked = totals.map((item, index) => ({
-    ...item,
-    position: index + 1,
-  }));
-
-  const studentRank = ranked.find((r) => r.studentId === studentId);
-
-  console.log('RANKED:', ranked);
-  console.log('FOUND RANK:', studentRank);
-
-  return studentRank || null;
-};
-
-
 export const studentService = {
   create,
   getAll,
@@ -233,5 +162,4 @@ export const studentService = {
   delete: deleteStudent,
   login, // ✅
   getMyResults, // ✅
-  getMeritPosition
 };
