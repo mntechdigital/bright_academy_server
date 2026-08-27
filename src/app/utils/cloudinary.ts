@@ -11,10 +11,22 @@ cloudinary.config({
 // Upload a PDF (received as an in-memory buffer via multer.memoryStorage())
 // directly to Cloudinary and return the secure URL. No file is ever written
 // to the local filesystem, so this works on Vercel's read-only filesystem.
+//
+// IMPORTANT: PDFs must be uploaded as resource_type 'image' so Cloudinary's
+// image pipeline (and its browser PDF viewer) can render them. Uploading as
+// 'raw' produces a /raw/upload/ URL that is only meant for download and
+// cannot be rendered -> "Failed to load PDF document".
 export const uploadPdfToCloudinary = async (
   file: Express.Multer.File | undefined,
 ): Promise<string> => {
+  console.log('Uploading PDF to Cloudinary:', {
+    originalname: file?.originalname,
+    mimetype: file?.mimetype,
+    size: file?.size,
+  });
+
   if (!file || !file.buffer) {
+    console.error('No file buffer received for Cloudinary upload.');
     return '';
   }
 
@@ -24,14 +36,21 @@ export const uploadPdfToCloudinary = async (
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: 'notices',
-        resource_type: 'raw',
+        resource_type: 'image', // renderable PDF (not 'raw')
         public_id: publicId,
-        format: 'pdf',
       },
       (error, result) => {
         if (error) {
+          console.error('Cloudinary upload error:', error);
           return reject(error);
         }
+        console.log('Cloudinary upload result:', {
+          resource_type: result?.resource_type,
+          format: result?.format,
+          bytes: result?.bytes,
+          secure_url: result?.secure_url,
+          public_id: result?.public_id,
+        });
         resolve(result?.secure_url ?? result?.url ?? '');
       },
     );
@@ -66,7 +85,7 @@ export const deleteNoticePdf = async (pdfUrl: string): Promise<void> => {
       return;
     }
 
-    await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+    await cloudinary.uploader.destroy(publicId, { resource_type: 'image' });
   } catch (error) {
     console.error('Failed to delete notice PDF from Cloudinary:', error);
   }
