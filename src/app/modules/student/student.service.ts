@@ -28,6 +28,21 @@ const create = async (payload: any) => {
 const update = async (id: string, payload: any) => {
   await prisma.student.findUniqueOrThrow({ where: { id } });
 
+  if (payload.stdRegNo) {
+    const existingStudent = await prisma.student.findFirst({
+      where: {
+        stdRegNo: payload.stdRegNo,
+        id: { not: id },
+      },
+    });
+
+    if (existingStudent) {
+      throw new Error("Registration number already exists");
+    }
+
+    payload.password = payload.stdRegNo;
+  }
+
   // password update করলে নতুন hash করুন ✅
   if (payload.password) {
     payload.password = await bcrypt.hash(payload.password, 10);
