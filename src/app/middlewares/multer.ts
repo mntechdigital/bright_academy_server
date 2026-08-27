@@ -50,15 +50,10 @@ export const imageUpload = multer({
   fileFilter: imageFilter,
 });
 
-const pdfStorage = multer.diskStorage({
-  destination: function (_req, _file, cb) {
-    cb(null, './public/notices');
-  },
-  filename: function (_req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, 'notice-' + uniqueSuffix + path.extname(file.originalname));
-  },
-});
+// Keep PDFs in memory so they can be streamed to Cloudinary.
+// Disk storage must NOT be used: Vercel serverless functions have a
+// read-only filesystem and cannot write to public/, uploads/ or storage/.
+const pdfStorage = multer.memoryStorage();
 
 const pdfFilter = function (req: any, file: any, cb: any) {
   if (file.mimetype === 'application/pdf') {

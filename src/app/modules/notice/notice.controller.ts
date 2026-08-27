@@ -1,18 +1,13 @@
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { noticeService } from './notice.service';
-import { deleteNoticePdf } from '../../utils/cloudinary';
+import { deleteNoticePdf, uploadPdfToCloudinary } from '../../utils/cloudinary';
 import AppError from '../../errors/AppError';
-import path from 'path';
 
 const createNotice = catchAsync(async (req, res) => {
   const { title, isPublished } = req.body;
 
-  let pdfUrl = '';
-
-  if (req.file) {
-    pdfUrl = req.file.filename;
-  }
+  const pdfUrl = await uploadPdfToCloudinary(req.file);
 
   const response = await noticeService.create({
     title,
@@ -65,11 +60,8 @@ const getNoticePdf = catchAsync(async (req, res) => {
     throw new AppError(404, 'No PDF attached to this notice');
   }
 
-  const filePath = path.resolve('public', 'notices', notice.pdfUrl);
-
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', 'inline; filename="' + notice.title.replace(/[^a-zA-Z0-9-_]/g, '_') + '.pdf"');
-  res.sendFile(filePath);
+  // The PDF lives on Cloudinary; redirect the client to its secure URL.
+  res.redirect(notice.pdfUrl);
 });
 
 const updateNotice = catchAsync(async (req, res) => {
@@ -88,7 +80,7 @@ const updateNotice = catchAsync(async (req, res) => {
     if (existingNotice.pdfUrl) {
       await deleteNoticePdf(existingNotice.pdfUrl);
     }
-    updateData.pdfUrl = req.file.filename;
+    updateData.pdfUrl = await uploadPdfToCloudinary(req.file);
   }
 
   const response = await noticeService.update(id, updateData);
