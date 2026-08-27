@@ -50,6 +50,30 @@ export const imageUpload = multer({
   fileFilter: imageFilter,
 });
 
+const pdfStorage = multer.diskStorage({
+  destination: function (_req, _file, cb) {
+    cb(null, './public/notices');
+  },
+  filename: function (_req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, 'notice-' + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const pdfFilter = function (req: any, file: any, cb: any) {
+  if (file.mimetype === 'application/pdf') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PDF files are allowed'), false);
+  }
+};
+
+export const pdfUpload = multer({
+  storage: pdfStorage,
+  fileFilter: pdfFilter,
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
 export const uploadImages = async (req: any, res: any, next: NextFunction) => {
   try {
     // Skip if no image files were uploaded
