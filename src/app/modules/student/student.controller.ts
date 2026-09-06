@@ -13,6 +13,7 @@ const createStudent = catchAsync(async (req, res) => {
 });
 
 const getAllStudents = catchAsync(async (req, res) => {
+	// Debug backend receipt — log raw incoming query to confirm class/batch/gender arrive (not stripped by DTO/validation pipe)
 	const response = await studentService.getAll(req.query);
 	sendResponse(res, {
 		statusCode: 200,
