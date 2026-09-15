@@ -1,4 +1,5 @@
 import prisma from "../../../db/db.config";
+import { Prisma } from "@prisma/client";
 import { builderQuery } from "../../builders/prismaBuilderQuery";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -115,9 +116,15 @@ const getAll = async (query: Record<string, any>) => {
   //  - Legacy filter JSON: ?filter={"classId":"...","batchId":"...","gender":"Female"}
   // Ensure params are not silently stripped: controller logs req.query, service logs normalizedFilter
   console.log("[studentService.getAll] incoming query:", query);
-  const parsedFilter: Record<string, any> = query.filter
-    ? JSON.parse(query.filter)
-    : {};
+  let parsedFilter: Record<string, any> = {};
+  if (query.filter) {
+    try {
+      parsedFilter = typeof query.filter === "string" ? JSON.parse(query.filter) : query.filter;
+    } catch (e) {
+      console.warn("[studentService.getAll] failed to parse filter JSON:", query.filter, e);
+      parsedFilter = {};
+    }
+  }
 
   const classParam =
     query.class ?? query.classId ?? parsedFilter.class ?? parsedFilter.classId ?? parsedFilter.className;
@@ -166,17 +173,37 @@ const getAll = async (query: Record<string, any>) => {
   // search may come as ?search= or ?searchTerm= — combine with filters via AND
   const searchTerm = query.searchTerm ?? query.search ?? "";
 
+  // Robust parse: query.orderBy may already be object if query parser did nested parse
+  let rawOrderBy: any = { createdAt: "desc" };
+  if (query.orderBy) {
+    try {
+      rawOrderBy = typeof query.orderBy === "string" ? JSON.parse(query.orderBy) : query.orderBy;
+    } catch (e) {
+      console.warn("[studentService.getAll] failed to parse orderBy, falling back:", query.orderBy, e);
+      rawOrderBy = { createdAt: "desc" };
+    }
+  }
+  // Detect numeric stdRegNo sort: frontend normally sends [{stdRegNo:"asc"},...] when class filtered
+  // Relax check to also accept plain object {stdRegNo:"asc"} and legacy ?sortBy=stdRegNo&sortOrder=asc
+  const needsNumericRegNoSort = (() => {
+    if (Array.isArray(rawOrderBy) && rawOrderBy.some((o: any) => o && typeof o === "object" && "stdRegNo" in o)) return true;
+    if (rawOrderBy && typeof rawOrderBy === "object" && !Array.isArray(rawOrderBy) && "stdRegNo" in rawOrderBy) return true;
+    if (query.sortBy === "stdRegNo" || (query as any).sortField === "stdRegNo" || (query as any).orderByField === "stdRegNo") return true;
+    return false;
+  })();
+
   const studentQuery = builderQuery({
     searchFields: ["name", "parentPhone", "address", "stdRegNo"],
     searchTerm,
     filter: normalizedFilter,
-    orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: "desc" },
+    orderBy: rawOrderBy,
     page: query.page ? Number(query.page) : 1,
     limit: query.limit ? Number(query.limit) : 10,
   });
 
   console.log("[studentService.getAll] normalizedFilter:", normalizedFilter);
   console.log("[studentService.getAll] where clause:", JSON.stringify(studentQuery.where, null, 2));
+  console.log("[studentService.getAll] orderBy:", JSON.stringify(rawOrderBy, null, 2), "needsNumericSort:", needsNumericRegNoSort);
 
   // CRITICAL: count must use SAME where as findMany — otherwise Total Students / pagination stays unfiltered (514 / 52 pages)
   const whereForCount = studentQuery.where;
@@ -185,17 +212,117 @@ const getAll = async (query: Record<string, any>) => {
   });
   const currentPage = Number(query.page) || 1;
   const totalPages = Math.ceil(totalStudents / studentQuery.take);
-  const response = await prisma.student.findMany({
-    ...studentQuery,
-    // ensure where is not overwritten — explicitly reuse whereForCount
-    where: whereForCount,
-    include: {
-      stdClass: true,
-      batch: true,
-      weeklyMarksSheets: true,
-      monthlyExamResults: true,
-    },
-  });
+
+  let response: any[];
+  // When sorting by stdRegNo (string column) we must sort numerically, not lexicographically.
+  // String sort fails for varying lengths / prefixes (e.g., "9" > "10" lexicographically but 9 < 10 numerically).
+  // Use DB-side CAST("stdRegNo" AS INTEGER) via raw query for stable numeric ordering, with pagination applied in DB.
+  // Counter-checked: class-8 string vs numeric identical for uniform 6-digit data, but numeric cast guarantees correctness across all classes/pages.
+  if (needsNumericRegNoSort) {
+    // Build raw WHERE fragments from normalizedFilter + searchTerm to mirror builderQuery's where
+    // Keep it explicit for class-filtered path (the only path that uses numeric stdRegNo sort)
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const whereClauses: any[] = [];
+    const params: any[] = [];
+    let paramIdx = 1;
+
+    // Helper to push Prisma.sql fragments safely
+    const sqlConditions: Prisma.Sql[] = [];
+
+    if (normalizedFilter.classId) {
+      sqlConditions.push(Prisma.sql`s."classId" = ${normalizedFilter.classId}`);
+    }
+    if (normalizedFilter.batchId) {
+      sqlConditions.push(Prisma.sql`s."batchId" = ${normalizedFilter.batchId}`);
+    }
+    // gender is stored as { equals, mode } or plain string
+    const genderVal = (normalizedFilter as any).gender?.equals ?? (normalizedFilter as any).gender;
+    if (genderVal) {
+      sqlConditions.push(Prisma.sql`s."gender" ILIKE ${genderVal}`);
+    }
+    // relation filters (stdClass / batch) when classParam was a name, not uuid
+    if ((normalizedFilter as any).stdClass?.className?.equals) {
+      const cn = (normalizedFilter as any).stdClass.className.equals;
+      sqlConditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "StdClass" c WHERE c.id = s."classId" AND c."className" ILIKE ${cn})`);
+    }
+    if ((normalizedFilter as any).batch?.name?.equals) {
+      const bn = (normalizedFilter as any).batch.name.equals;
+      sqlConditions.push(Prisma.sql`EXISTS (SELECT 1 FROM "Batch" b WHERE b.id = s."batchId" AND b.name ILIKE ${bn})`);
+    }
+    if (searchTerm) {
+      const like = `%${searchTerm}%`;
+      sqlConditions.push(
+        Prisma.sql`(s.name ILIKE ${like} OR s."parentPhone" ILIKE ${like} OR s.address ILIKE ${like} OR s."stdRegNo" ILIKE ${like})`,
+      );
+    }
+
+    const whereSql = sqlConditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(sqlConditions, " AND ")}` : Prisma.empty;
+
+    // Raw IDs sorted numerically — pagination applied here, so serial (offset+index+1) is stable
+    // Use CAST with regex guard to avoid error on non-numeric stdRegNo (should not happen, but fallback to string)
+    // TRIM handles inconsistent whitespace (e.g. " 806054 "); BIGINT avoids overflow vs INTEGER (max 2147483647)
+    const sortedIds: { id: string }[] = await prisma.$queryRaw`
+      SELECT s.id FROM "Student" s
+      ${whereSql}
+      ORDER BY
+        CASE WHEN TRIM(s."stdRegNo") ~ '^[0-9]+$' THEN CAST(TRIM(s."stdRegNo") AS BIGINT) ELSE NULL END ASC NULLS LAST,
+        s.name ASC,
+        s."createdAt" ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+    const ids = sortedIds.map((r) => r.id);
+    console.log("[studentService.getAll] sortedIds (raw numeric order):", JSON.stringify(sortedIds, null, 2));
+    // Debug: also log raw stdRegNo values in that order for class-8 diagnosis (re-query to surface actual stored values)
+    if (ids.length > 0) {
+      const debugRegs: { id: string; stdRegNo: string | null }[] = await prisma.$queryRaw`
+        SELECT s.id, s."stdRegNo" FROM "Student" s WHERE s.id IN (${Prisma.join(ids)})
+      `;
+      // Re-order debugRegs to sortedIds order for readability
+      const regById = new Map(debugRegs.map((r: any) => [r.id, r.stdRegNo]));
+      console.log("[studentService.getAll] stdRegNo in sorted order:", ids.map((id) => ({ id, stdRegNo: regById.get(id) })));
+      // If counts mismatch, surface warning (race/deleted row between queries)
+      if (debugRegs.length !== ids.length) {
+        console.warn("[studentService.getAll] WARNING: sortedIds vs debugRegs count mismatch", { sortedIds: ids.length, debugRegs: debugRegs.length });
+      }
+    }
+    if (ids.length === 0) {
+      response = [];
+    } else {
+      const unsorted = await prisma.student.findMany({
+        where: { id: { in: ids } },
+        include: {
+          stdClass: true,
+          batch: true,
+          weeklyMarksSheets: true,
+          monthlyExamResults: true,
+        },
+      });
+      // Re-order to match raw sorted order (Prisma IN does not preserve order)
+      const byId = new Map(unsorted.map((s: any) => [s.id, s]));
+      response = ids.map((id) => byId.get(id)).filter(Boolean) as any[];
+      // Step 3 debug: confirm re-assembly preserved order and didn't drop rows
+      console.log("[studentService.getAll] re-assembled response order:", response.map((r: any) => ({ id: r.id, stdRegNo: r.stdRegNo })));
+      if (response.length !== ids.length) {
+        console.warn("[studentService.getAll] WARNING: re-assembly dropped rows", { ids: ids.length, response: response.length, missing: ids.filter((id) => !byId.has(id)) });
+      }
+    }
+  } else {
+    response = await prisma.student.findMany({
+      ...studentQuery,
+      // ensure where is not overwritten — explicitly reuse whereForCount
+      where: whereForCount,
+      include: {
+        stdClass: true,
+        batch: true,
+        weeklyMarksSheets: true,
+        monthlyExamResults: true,
+      },
+    });
+  }
 
   return {
     meta: {
