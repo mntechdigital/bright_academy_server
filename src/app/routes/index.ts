@@ -10,6 +10,7 @@ import { MonthlyResultRoutes } from "../modules/monthly-result/monthly-result.ro
 import { TeacherRoutes } from '../modules/teacher/teacher.routes';
 import { BatchRoutes } from "../batch/batch.route";
 import { NoticeRoutes } from "../modules/notice/notice.routes";
+import { ExamRoutineRoutes } from "../modules/exam-routine/exam-routine.routes";
 
 const router = Router();
 
@@ -57,6 +58,10 @@ const moduleRoutes: TModuleRoute[] = [
   {
     path: "/notices",
     route: NoticeRoutes,
+  },
+  {
+    path: "/exam-routines",
+    route: ExamRoutineRoutes,
   }
 ];
 
