@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  MARKS_PER_SUBJECT,
+  SUBJECTS_PER_WEEK,
+  TOTAL_MARKS_PER_WEEK,
+} from './exam-routine.constants';
+
+export { MARKS_PER_SUBJECT, SUBJECTS_PER_WEEK, TOTAL_MARKS_PER_WEEK };
 
 export const STREAMS = ['Science', 'Business', 'Humanity'] as const;
 
@@ -29,7 +36,10 @@ const routineSubjectSchema = z.object({
   fullMarks: z
     .number({ required_error: 'fullMarks is required' })
     .int('fullMarks must be an integer')
-    .positive('fullMarks must be a positive integer'),
+    .refine(
+      (value) => value === MARKS_PER_SUBJECT,
+      `fullMarks must be exactly ${MARKS_PER_SUBJECT}`,
+    ),
   alternatives: z.array(alternativeSchema).optional().default([]),
 });
 
@@ -43,7 +53,10 @@ const routineWeekSchema = z
     totalMarks: z
       .number({ required_error: 'totalMarks is required' })
       .int('totalMarks must be an integer')
-      .positive('totalMarks must be a positive integer'),
+      .refine(
+        (value) => value === TOTAL_MARKS_PER_WEEK,
+        `totalMarks must be exactly ${TOTAL_MARKS_PER_WEEK}`,
+      ),
     durationHours: z
       .number()
       .int('durationHours must be an integer')
@@ -52,7 +65,10 @@ const routineWeekSchema = z
       .optional(),
     subjects: z
       .array(routineSubjectSchema)
-      .min(1, 'Each week must have at least one subject'),
+      .length(
+        SUBJECTS_PER_WEEK,
+        `Each week must have exactly ${SUBJECTS_PER_WEEK} subjects`,
+      ),
   })
   .superRefine((week, ctx) => {
     const seenSubjectIds = new Set<string>();
@@ -65,6 +81,16 @@ const routineWeekSchema = z
       }
       seenSubjectIds.add(subject.subjectId);
     });
+
+    // The printed total must equal the sum of the subject marks.
+    const sum = week.subjects.reduce((total, subject) => total + subject.fullMarks, 0);
+    if (sum !== week.totalMarks) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['totalMarks'],
+        message: `totalMarks (${week.totalMarks}) must equal the sum of the subject marks (${sum})`,
+      });
+    }
   });
 
 const routineWeeksSchema = z

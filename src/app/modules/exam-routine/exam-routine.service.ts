@@ -1,5 +1,10 @@
 import prisma from '../../../db/db.config';
 import AppError from '../../errors/AppError';
+import {
+  MARKS_PER_SUBJECT,
+  SUBJECTS_PER_WEEK,
+  TOTAL_MARKS_PER_WEEK,
+} from './exam-routine.constants';
 
 export const ALLOWED_STREAMS = ['Science', 'Business', 'Humanity'] as const;
 export type AllowedStream = (typeof ALLOWED_STREAMS)[number];
@@ -246,6 +251,55 @@ const toDurationHours = (week: RoutineWriteWeek): number | null => {
   return week.durationHours ?? null;
 };
 
+// Mirrors the DTO rules so the service is safe when called directly (the
+// import script and internal callers bypass the Zod middleware).
+const assertWeekShape = (week: RoutineWriteWeek) => {
+  if (week.subjects.length !== SUBJECTS_PER_WEEK) {
+    throw new AppError(
+      400,
+      `Week ${week.weekNo} must have exactly ${SUBJECTS_PER_WEEK} subjects, received ${week.subjects.length}`,
+    );
+  }
+
+  const seen = new Set<string>();
+  for (const subject of week.subjects) {
+    if (subject.fullMarks !== MARKS_PER_SUBJECT) {
+      throw new AppError(
+        400,
+        `Week ${week.weekNo}: every subject must be worth exactly ${MARKS_PER_SUBJECT} marks (subject "${subject.subjectId}" is ${subject.fullMarks})`,
+      );
+    }
+    if (seen.has(subject.subjectId)) {
+      throw new AppError(
+        400,
+        `Week ${week.weekNo}: the same subject cannot appear twice in the same week (subject "${subject.subjectId}")`,
+      );
+    }
+    seen.add(subject.subjectId);
+  }
+
+  const sum = week.subjects.reduce(
+    (total, subject) => total + subject.fullMarks,
+    0,
+  );
+  if (week.totalMarks !== sum) {
+    throw new AppError(
+      400,
+      `Week ${week.weekNo}: totalMarks (${week.totalMarks}) must equal the sum of the subject marks (${sum})`,
+    );
+  }
+  if (week.totalMarks !== TOTAL_MARKS_PER_WEEK) {
+    throw new AppError(
+      400,
+      `Week ${week.weekNo}: totalMarks must be exactly ${TOTAL_MARKS_PER_WEEK}`,
+    );
+  }
+};
+
+const assertWeekShapes = (weeks: RoutineWriteWeek[]) => {
+  weeks.forEach(assertWeekShape);
+};
+
 // Looks up a routine by its natural key. Returns null when absent so callers
 // can switch between "create" and "append weeks" without relying on a 409.
 const findByKey = async (key: {
@@ -265,6 +319,8 @@ const findByKey = async (key: {
 };
 
 const create = async (payload: RoutineWritePayload) => {
+  assertWeekShapes(payload.weeks);
+
   const { subjectById } = await resolveSubjectsForClass(
     payload.classId,
     payload.weeks,
@@ -320,6 +376,8 @@ const create = async (payload: RoutineWritePayload) => {
 // are never modified or deleted, so this is safe to call repeatedly with any
 // set of missing week numbers in any order.
 const addWeeks = async (id: string, weeks: RoutineWriteWeek[]) => {
+  assertWeekShapes(weeks);
+
   const routine = await prisma.examRoutine.findUnique({
     where: { id },
     select: { id: true, classId: true },
@@ -423,6 +481,7 @@ const update = async (
 
   let subjectById: Map<string, { subjectName: string }> | undefined;
   if (payload.weeks) {
+    assertWeekShapes(payload.weeks);
     const resolved = await resolveSubjectsForClass(
       existing.classId,
       payload.weeks,
