@@ -14,6 +14,7 @@ const getAllExamRoutines = catchAsync(async (req, res) => {
   const parsed = ExamRoutineValidation.examRoutineQuerySchema.safeParse({
     year: dropEmpty(req.query.year),
     classId: dropEmpty(req.query.classId),
+    examName: dropEmpty(req.query.examName),
     stream: dropEmpty(req.query.stream),
   });
 
@@ -62,6 +63,19 @@ const createExamRoutine = catchAsync(async (req, res) => {
   });
 });
 
+const addExamRoutineWeeks = catchAsync(async (req, res) => {
+  const response = await examRoutineService.addWeeks(
+    req.params.id as string,
+    req.body.weeks,
+  );
+  sendResponse(res, {
+    statusCode: 201,
+    success: true,
+    message: 'Weeks added to exam routine successfully',
+    data: response,
+  });
+});
+
 const updateExamRoutine = catchAsync(async (req, res) => {
   const response = await examRoutineService.update(
     req.params.id as string,
@@ -102,6 +116,7 @@ export const examRoutineController = {
   getAllExamRoutines,
   getExamRoutineById,
   createExamRoutine,
+  addExamRoutineWeeks,
   updateExamRoutine,
   deleteExamRoutine,
   duplicateExamRoutine,

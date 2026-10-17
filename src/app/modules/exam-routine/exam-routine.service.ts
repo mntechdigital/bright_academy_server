@@ -39,6 +39,7 @@ const shapeRoutine = (
     createdAt: Date;
     updatedAt: Date;
     stdClass: { id: string; className: string };
+    _count: { weeks: number };
     weeks: {
       id: string;
       weekNo: number;
@@ -62,6 +63,9 @@ const shapeRoutine = (
     year: routine.year,
     month: routine.month,
     stdClass: routine.stdClass,
+    // Real number of stored week records, never the highest week number.
+    weekCount: routine._count.weeks,
+    weekNumbers: routine.weeks.map((week) => week.weekNo),
     weeks: routine.weeks.map((week) => {
       const computedMarks = week.subjects.reduce(
         (sum, subject) => sum + subject.fullMarks,
@@ -94,6 +98,9 @@ const routineInclude = {
   stdClass: {
     select: { id: true, className: true },
   },
+  _count: {
+    select: { weeks: true },
+  },
   weeks: {
     orderBy: { weekNo: 'asc' as const },
     include: {
@@ -111,6 +118,7 @@ const routineInclude = {
 const getAll = async (query: {
   year?: string;
   classId?: string;
+  examName?: string;
   stream?: string;
 }) => {
   if (
@@ -127,6 +135,7 @@ const getAll = async (query: {
     where: {
       ...(query.year && { year: query.year }),
       ...(query.classId && { classId: query.classId }),
+      ...(query.examName && { examName: query.examName }),
     },
     include: routineInclude,
     orderBy: { createdAt: 'asc' },
@@ -237,26 +246,42 @@ const toDurationHours = (week: RoutineWriteWeek): number | null => {
   return week.durationHours ?? null;
 };
 
+// Looks up a routine by its natural key. Returns null when absent so callers
+// can switch between "create" and "append weeks" without relying on a 409.
+const findByKey = async (key: {
+  examName: string;
+  year: string;
+  classId: string;
+}) => {
+  return prisma.examRoutine.findUnique({
+    where: {
+      examName_year_classId: {
+        examName: key.examName,
+        year: key.year,
+        classId: key.classId,
+      },
+    },
+  });
+};
+
 const create = async (payload: RoutineWritePayload) => {
   const { subjectById } = await resolveSubjectsForClass(
     payload.classId,
     payload.weeks,
   );
 
-  const existing = await prisma.examRoutine.findUnique({
-    where: {
-      examName_year_classId: {
-        examName: payload.examName,
-        year: payload.year,
-        classId: payload.classId,
-      },
-    },
+  const existing = await findByKey({
+    examName: payload.examName,
+    year: payload.year,
+    classId: payload.classId,
   });
 
   if (existing) {
+    // A routine for this class/exam/year already exists. Creating a second one
+    // is never correct: the caller must append the missing weeks instead.
     throw new AppError(
       409,
-      `Exam routine "${payload.examName}" for year ${payload.year} already exists for this class`,
+      `Exam routine "${payload.examName}" for year ${payload.year} already exists for this class. Add the missing weeks to the existing routine instead of creating a new one.`,
     );
   }
 
@@ -289,6 +314,71 @@ const create = async (payload: RoutineWritePayload) => {
   });
 
   return getById(created.id);
+};
+
+// Appends new weeks to an existing routine. Existing weeks and their subjects
+// are never modified or deleted, so this is safe to call repeatedly with any
+// set of missing week numbers in any order.
+const addWeeks = async (id: string, weeks: RoutineWriteWeek[]) => {
+  const routine = await prisma.examRoutine.findUnique({
+    where: { id },
+    select: { id: true, classId: true },
+  });
+
+  if (!routine) {
+    throw new AppError(404, 'Exam routine not found');
+  }
+
+  const { subjectById } = await resolveSubjectsForClass(
+    routine.classId,
+    weeks,
+  );
+
+  const existingWeeks = await prisma.routineWeek.findMany({
+    where: { routineId: id },
+    select: { weekNo: true },
+  });
+  const takenWeekNos = new Set(existingWeeks.map((week) => week.weekNo));
+
+  for (const week of weeks) {
+    if (takenWeekNos.has(week.weekNo)) {
+      throw new AppError(
+        409,
+        `Week ${week.weekNo} already exists in this routine`,
+      );
+    }
+    takenWeekNos.add(week.weekNo);
+  }
+
+  await prisma.$transaction(
+    async (tx) => {
+      for (const week of weeks) {
+        await tx.routineWeek.create({
+          data: {
+            routineId: id,
+            weekNo: week.weekNo,
+            weekLabel: toWeekLabel(week),
+            totalMarks: week.totalMarks,
+            durationHours: toDurationHours(week),
+            subjects: {
+              create: week.subjects.map((subject) => ({
+                displayName: toDisplayName(
+                  subject,
+                  subjectById.get(subject.subjectId)!.subjectName,
+                ),
+                fullMarks: subject.fullMarks,
+                subjectId: subject.subjectId,
+                alternatives: subject.alternatives ?? [],
+              })),
+            },
+          },
+        });
+      }
+    },
+    { timeout: 30000, maxWait: 15000 },
+  );
+
+  return getById(id);
 };
 
 const update = async (
@@ -606,6 +696,7 @@ export const examRoutineService = {
   getAll,
   getById,
   create,
+  addWeeks,
   update,
   delete: remove,
   duplicate,

@@ -18,6 +18,16 @@ router.post(
   examRoutineController.createExamRoutine,
 );
 
+// Appends new weeks to an existing routine without touching the stored weeks.
+// Use this when a routine already exists for the class + exam name + year and
+// only some weeks (e.g. Week 1..3) are still missing.
+router.post(
+  '/:id/weeks',
+  auth([featureNames.result]),
+  validation(ExamRoutineValidation.addExamRoutineWeeksSchema),
+  examRoutineController.addExamRoutineWeeks,
+);
+
 router.post(
   '/:id/duplicate',
   auth([featureNames.result]),

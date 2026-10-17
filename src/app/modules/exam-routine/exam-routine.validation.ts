@@ -5,6 +5,7 @@ export const STREAMS = ['Science', 'Business', 'Humanity'] as const;
 export const examRoutineQuerySchema = z.object({
   year: z.string().min(1).optional(),
   classId: z.string().min(1).optional(),
+  examName: z.string().min(1).optional(),
   stream: z.enum(STREAMS).optional(),
 });
 
@@ -147,10 +148,19 @@ export const duplicateExamRoutineSchema = z.object({
   }),
 });
 
+// Appends one or more new weeks to an existing routine. Existing weeks are
+// never touched, and weekNo must not collide with a week already stored.
+export const addExamRoutineWeeksSchema = z.object({
+  body: z.object({
+    weeks: routineWeeksSchema,
+  }),
+});
+
 export const ExamRoutineValidation = {
   examRoutineQuerySchema,
   examRoutineByIdQuerySchema,
   createExamRoutineSchema,
   updateExamRoutineSchema,
   duplicateExamRoutineSchema,
+  addExamRoutineWeeksSchema,
 };
