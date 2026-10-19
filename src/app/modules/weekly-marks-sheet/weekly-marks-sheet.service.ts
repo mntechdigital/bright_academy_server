@@ -380,6 +380,33 @@ export const bulkUpsertStudentMarks = async (payload: {
   };
 };
 
+// ─── Merit ranking (shared by the weekly and "Overall" modes) ────────────────
+// Reuses the original weekly rule unchanged — it is the only ranking rule in
+// this codebase:
+//   • sum obtained marks per student (null / absent cells add 0 → absent = 0)
+//   • sort descending by the total only: there is NO GPA tie-break and NO
+//     shared ranks. Equal totals keep their original insertion order (the
+//     sort is stable) and receive distinct sequential positions (index + 1).
+//   • a student with no non-null mark in the period is never ranked; the
+//     endpoint returns null for them (frontend falls back as before).
+type MeritTotal = { studentId: string; totalMarks: number };
+type MeritRanked = MeritTotal & { position: number };
+
+const rankTotals = (totals: MeritTotal[]): MeritRanked[] => {
+  // বেশি নম্বর আগে
+  totals.sort((a, b) => b.totalMarks - a.totalMarks);
+  return totals.map((item, index) => ({ ...item, position: index + 1 }));
+};
+
+// "Week 3" / "Week-3" / "3" -> 3; anything unparseable -> null.
+const normalizeWeek = (week: string): number | null => {
+  const cleaned = week.replace(/Week[- ]?/i, "").trim();
+  return /^\d+$/.test(cleaned) ? parseInt(cleaned, 10) : null;
+};
+
+// Only Week 1..Week 4 belong to a month's merit calculation.
+const MERIT_MONTH_WEEKS = [1, 2, 3, 4];
+
 const getMeritPosition = async ({
   classId,
   week,
@@ -388,7 +415,9 @@ const getMeritPosition = async ({
   studentId,
 }: {
   classId: string;
-  week: string;
+  // "Week 1".."Week 4" → single-week rank; "Overall" (or omitted) → the
+  // whole month across all four weeks.
+  week?: string;
   month: string;
   year: string;
   studentId: string;
@@ -402,8 +431,11 @@ const getMeritPosition = async ({
     studentId,
   });
 
+  // "Overall" (case-insensitive) or a missing week ranks the whole month.
+  const isOverall = !week || week.trim().toLowerCase() === 'overall';
+
   // Week normalize: Week 1 / Week-1 => 1
-  const requestedWeek = week.replace(/Week[- ]?/i, "").trim();
+  const requestedWeek = week ? normalizeWeek(week) : null;
 
   // একই class + month + year এর সব marks আনো
   const marks = await prisma.weeklyMarksSheet.findMany({
@@ -424,7 +456,12 @@ const getMeritPosition = async ({
 
   // Requested week অনুযায়ী filter
   const filteredMarks = marks.filter((m) => {
-    const dbWeek = m.week.replace(/Week[- ]?/i, "").trim();
+    const dbWeek = normalizeWeek(m.week);
+    if (dbWeek === null) return false;
+    // "Overall" keeps all four weeks of the month (a single query serves
+    // both modes); the weekly mode keeps only the requested week. Stray
+    // week values outside 1..4 never count.
+    if (isOverall) return MERIT_MONTH_WEEKS.includes(dbWeek);
     return dbWeek === requestedWeek;
   });
 
@@ -449,14 +486,9 @@ const getMeritPosition = async ({
     totalMarks: total,
   }));
 
-  // বেশি নম্বর আগে
-  totals.sort((a, b) => b.totalMarks - a.totalMarks);
-
-  // rank assign
-  const ranked = totals.map((item, index) => ({
-    ...item,
-    position: index + 1,
-  }));
+  // বেশি নম্বর আগে — shared weekly/Overall rule via rankTotals() (no GPA
+  // tie-break, no shared ranks; equal totals keep insertion order).
+  const ranked = rankTotals(totals);
 
   console.log("RANKED:", ranked);
 

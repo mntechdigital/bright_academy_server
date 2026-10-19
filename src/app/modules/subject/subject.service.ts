@@ -101,6 +101,18 @@ const deleteSubject = async (id: string) => {
   await prisma.subject.findUniqueOrThrow({
     where: { id },
   });
+
+  const usedInRoutine = await prisma.routineSubject.count({
+    where: { subjectId: id },
+  });
+
+  if (usedInRoutine > 0) {
+    throw new AppError(
+      409,
+      'This subject is used in an exam routine and cannot be deleted',
+    );
+  }
+
   return prisma.subject.delete({ where: { id } });
 };
 

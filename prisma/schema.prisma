@@ -84,6 +84,7 @@ model StdClass {
   updatedAt         DateTime           @updatedAt
   weeklyMarksSheets WeeklyMarksSheet[]
   monthlyExamResults MonthlyExamResult[]
+  examRoutines      ExamRoutine[]
 }
 
 model Subject {
@@ -95,6 +96,7 @@ model Subject {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   monthlyExamResults MonthlyExamResult[]
+  routineSubjects    RoutineSubject[]
 
   @@unique([classId, subjectName])
 }
@@ -199,4 +201,48 @@ model Notice {
   isPublished Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model ExamRoutine {
+  id        String   @id @default(uuid())
+  examName  String
+  year      String
+  month     String?
+  classId   String
+  stdClass  StdClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+  weeks     RoutineWeek[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([examName, year, classId])
+}
+
+model RoutineWeek {
+  id            String           @id @default(uuid())
+  routineId     String
+  routine       ExamRoutine      @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  weekNo        Int
+  weekLabel     String
+  totalMarks    Int
+  durationHours Int?
+  subjects      RoutineSubject[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([routineId, weekNo])
+}
+
+model RoutineSubject {
+  id          String   @id @default(uuid())
+  weekId      String
+  week        RoutineWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  displayName String
+  fullMarks   Int
+  subjectId   String
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  alternatives Json    @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([weekId, subjectId])
 }
