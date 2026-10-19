@@ -91,6 +91,7 @@ model Subject {
   id                 String              @id @default(uuid())
   subjectName        String
   classId            String
+  sortOrder          Int                 @default(0)
   stdClass           StdClass            @relation(fields: [classId], references: [id], onDelete: Cascade)
   weeklyMarksSheets  WeeklyMarksSheet[]
   createdAt          DateTime            @default(now())

@@ -24,9 +24,15 @@ const create = async (payload: any) => {
     throw new AppError(400, `Subject '${payload.subjectName}' already exists for this class`);
   }
 
+  // New subjects append to the end of the class's subject list.
+  const classSubjectCount = await prisma.subject.count({
+    where: { classId: payload.classId },
+  });
+
   return prisma.subject.create({
     data: {
       ...payload,
+      sortOrder: classSubjectCount,
     },
   });
 };
@@ -36,7 +42,7 @@ const getAll = async (query: Record<string, any>) => {
     searchFields: ['subjectName'],
     searchTerm: query.searchTerm,
     filter: query.filter ? JSON.parse(query.filter) : {},
-    orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: 'desc' },
+    orderBy: query.orderBy ? JSON.parse(query.orderBy) : { sortOrder: 'asc' },
     page: query.page ? Number(query.page) : 1,
     limit: query.limit ? Number(query.limit) : 10,
   });
@@ -93,8 +99,44 @@ const update = async (id: string, payload: any) => {
     data: {
       subjectName: payload.subjectName,
       classId: payload.classId,
+      ...(payload.sortOrder !== undefined && { sortOrder: payload.sortOrder }),
     },
   });
+};
+
+/**
+ * Move a subject one position up/down within its class list by swapping
+ * sortOrder with the adjacent subject.
+ */
+const move = async (id: string, direction: 'up' | 'down') => {
+  const subject = await prisma.subject.findUniqueOrThrow({ where: { id } });
+
+  const classSubjects = await prisma.subject.findMany({
+    where: { classId: subject.classId },
+    orderBy: [{ sortOrder: 'asc' }, { subjectName: 'asc' }],
+    select: { id: true, sortOrder: true },
+  });
+
+  const index = classSubjects.findIndex((s) => s.id === id);
+  const swapWith =
+    direction === 'up' ? classSubjects[index - 1] : classSubjects[index + 1];
+
+  if (!swapWith) {
+    return subject;
+  }
+
+  await prisma.$transaction([
+    prisma.subject.update({
+      where: { id },
+      data: { sortOrder: swapWith.sortOrder },
+    }),
+    prisma.subject.update({
+      where: { id: swapWith.id },
+      data: { sortOrder: subject.sortOrder },
+    }),
+  ]);
+
+  return prisma.subject.findUniqueOrThrow({ where: { id } });
 };
 
 const deleteSubject = async (id: string) => {
@@ -121,5 +163,6 @@ export const subjectService = {
   getAll,
   getById,
   update,
+  move,
   delete: deleteSubject,
 };

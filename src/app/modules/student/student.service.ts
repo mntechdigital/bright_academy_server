@@ -4,6 +4,10 @@ import { builderQuery } from "../../builders/prismaBuilderQuery";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import configs from "../../configs";
+import {
+  orderedSubjectsForClass,
+  sortRowsBySubjectOrder,
+} from "../subject/subject.util";
 
 const create = async (payload: any) => {
   const existingStudent = await prisma.student.findFirst({
@@ -93,19 +97,35 @@ const login = async (payload: { userId: string; password: string }) => {
 
 // নিজের result দেখার service ✅
 const getMyResults = async (studentId: string) => {
+  const student = await prisma.student.findFirstOrThrow({
+    where: { id: studentId },
+    select: { classId: true },
+  });
+
+  // The class's subject list defines the canonical subject order. It is
+  // returned alongside the marks so the UI can also render subjects the
+  // student has no marks for (empty cells) in the same fixed order.
+  const classSubjects = await orderedSubjectsForClass(student.classId);
+
   const monthlyResults = await prisma.monthlyExamResult.findMany({
     where: { studentId },
     include: { results: true },
     orderBy: { createdAt: "desc" },
   });
 
+  // SubjectResult rows carry no subject relation, so sort them in code
+  // against the class subject list (rows with unknown subjects go last).
+  for (const result of monthlyResults) {
+    result.results = sortRowsBySubjectOrder(result.results, classSubjects);
+  }
+
   const weeklyMarks = await prisma.weeklyMarksSheet.findMany({
     where: { studentId },
     include: { subject: true },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ subject: { sortOrder: "asc" } }, { subject: { subjectName: "asc" } }],
   });
 
-  return { monthlyResults, weeklyMarks };
+  return { monthlyResults, weeklyMarks, classSubjects };
 };
 
 
