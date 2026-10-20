@@ -21,6 +21,12 @@ router.put(
   subjectController.updateSubject,
 );
 
+router.post(
+  '/:id/move',
+  validation(SubjectValidation.moveSubjectSchema),
+  subjectController.moveSubject,
+);
+
 router.delete(
   '/:id',
   subjectController.deleteSubject,

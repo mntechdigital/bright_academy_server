@@ -1,5 +1,9 @@
 import prisma from "../../../db/db.config";
 import { builderQuery } from "../../builders/prismaBuilderQuery";
+import {
+  orderedSubjectsForClass,
+  sortRowsBySubjectOrder,
+} from "../subject/subject.util";
 
 /**
  * Create Monthly Result
@@ -31,7 +35,7 @@ const create = async (payload: any) => {
     },
   });
 
-  return prisma.monthlyExamResult.create({
+  const created = await prisma.monthlyExamResult.create({
     data: {
       ...restPayload,
 
@@ -66,6 +70,13 @@ const create = async (payload: any) => {
       results: true,
     },
   });
+
+  created.results = sortRowsBySubjectOrder(
+    created.results,
+    await orderedSubjectsForClass(student.classId),
+  );
+
+  return created;
 };
 
 /**
@@ -138,6 +149,21 @@ const getAll = async (query: Record<string, any>) => {
     },
   });
 
+  // Sort each result's subject rows by its own class subject list (rows with
+  // unknown subjects go last, sorted by name). One fetch per distinct class.
+  const subjectsByClass = new Map<string, { subjectName: string }[]>();
+  for (const result of response) {
+    const classId = result.student?.classId;
+    if (!classId) continue;
+    if (!subjectsByClass.has(classId)) {
+      subjectsByClass.set(classId, await orderedSubjectsForClass(classId));
+    }
+    result.results = sortRowsBySubjectOrder(
+      result.results,
+      subjectsByClass.get(classId)!,
+    );
+  }
+
   return {
     meta: {
       totalItems: totalMonthlyResults,
@@ -152,7 +178,7 @@ const getAll = async (query: Record<string, any>) => {
  * Get Single Monthly Result
  */
 const getById = async (id: string) => {
-  return prisma.monthlyExamResult.findUnique({
+  const result = await prisma.monthlyExamResult.findUnique({
     where: { id },
     include: {
       student: {
@@ -164,6 +190,15 @@ const getById = async (id: string) => {
       results: true,
     },
   });
+
+  if (result?.student.classId) {
+    result.results = sortRowsBySubjectOrder(
+      result.results,
+      await orderedSubjectsForClass(result.student.classId),
+    );
+  }
+
+  return result;
 };
 
 /**

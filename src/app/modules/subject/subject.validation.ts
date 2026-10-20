@@ -11,10 +11,18 @@ const updateSubjectSchema = z.object({
   body: z.object({
     subjectName: z.string().optional(),
     classId: z.string().optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  }),
+});
+
+const moveSubjectSchema = z.object({
+  body: z.object({
+    direction: z.enum(['up', 'down']),
   }),
 });
 
 export const SubjectValidation = {
   createSubjectSchema,
   updateSubjectSchema,
+  moveSubjectSchema,
 };

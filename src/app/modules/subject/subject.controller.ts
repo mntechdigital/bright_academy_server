@@ -42,6 +42,19 @@ const updateSubject = catchAsync(async (req, res) => {
 	});
 });
 
+const moveSubject = catchAsync(async (req, res) => {
+	const response = await subjectService.move(
+		req.params.id as string,
+		req.body.direction,
+	);
+	sendResponse(res, {
+		statusCode: 200,
+		success: true,
+		message: 'Subject moved successfully',
+		data: response,
+	});
+});
+
 const deleteSubject = catchAsync(async (req, res) => {
 	const response = await subjectService.delete(req.params.id as string);
 	sendResponse(res, {
@@ -57,5 +70,6 @@ export const subjectController = {
 	getAllSubjects,
 	getSubjectById,
 	updateSubject,
+	moveSubject,
 	deleteSubject,
 };
