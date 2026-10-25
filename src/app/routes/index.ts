@@ -11,6 +11,7 @@ import { TeacherRoutes } from '../modules/teacher/teacher.routes';
 import { BatchRoutes } from "../batch/batch.route";
 import { NoticeRoutes } from "../modules/notice/notice.routes";
 import { ExamRoutineRoutes } from "../modules/exam-routine/exam-routine.routes";
+import { ResultRoutes } from "../modules/result/result.routes";
 
 const router = Router();
 
@@ -62,6 +63,10 @@ const moduleRoutes: TModuleRoute[] = [
   {
     path: "/exam-routines",
     route: ExamRoutineRoutes,
+  },
+  {
+    path: "/results",
+    route: ResultRoutes,
   }
 ];
 
@@ -70,3 +75,5 @@ moduleRoutes.forEach((route) => {
 });
 
 export default router;
+
+
