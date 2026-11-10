@@ -8,8 +8,10 @@ const login = catchAsync(async (req, res) => {
 
   res.cookie('refreshToken', response.refreshToken, {
     httpOnly: true,
-    sameSite: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 24 * 60 * 60 * 1000,
+    path: '/',
   });
 
   sendResponse(res, {
@@ -17,6 +19,21 @@ const login = catchAsync(async (req, res) => {
     success: true,
     message: 'Login Successful',
     data: response,
+  });
+});
+
+const logout = catchAsync(async (req, res) => {
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+  });
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Logout successful',
   });
 });
 
@@ -162,6 +179,7 @@ const deleteAdminUser = catchAsync(async (req, res) => {
 
 export const AuthController = {
   login,
+  logout,
   register,
   forgetPassword,
   resetPassword,

@@ -14,6 +14,8 @@ router.post(
   AuthController.login,
 );
 
+router.post('/logout', AuthController.logout);
+
 router.post(
   '/register',
   auth([featureNames.auth]),
