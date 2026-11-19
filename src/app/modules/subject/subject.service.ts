@@ -79,7 +79,7 @@ const getById = async (id: string) => {
 };
 
 const update = async (id: string, payload: any) => {
-  await prisma.subject.findUniqueOrThrow({
+  const subject = await prisma.subject.findUniqueOrThrow({
     where: { id },
   });
 
@@ -94,13 +94,25 @@ const update = async (id: string, payload: any) => {
     }
   }
 
-  return prisma.subject.update({
-    where: { id },
-    data: {
-      subjectName: payload.subjectName,
-      classId: payload.classId,
-      ...(payload.sortOrder !== undefined && { sortOrder: payload.sortOrder }),
-    },
+  return prisma.$transaction(async (tx) => {
+    if (payload.subjectName && payload.subjectName !== subject.subjectName) {
+      await tx.subjectResult.updateMany({
+        where: {
+          subjectName: subject.subjectName,
+          examResult: { classId: subject.classId },
+        },
+        data: { subjectName: payload.subjectName },
+      });
+    }
+
+    return tx.subject.update({
+      where: { id },
+      data: {
+        subjectName: payload.subjectName,
+        classId: payload.classId,
+        ...(payload.sortOrder !== undefined && { sortOrder: payload.sortOrder }),
+      },
+    });
   });
 };
 
@@ -140,18 +152,43 @@ const move = async (id: string, direction: 'up' | 'down') => {
 };
 
 const deleteSubject = async (id: string) => {
-  await prisma.subject.findUniqueOrThrow({
+  const subject = await prisma.subject.findUniqueOrThrow({
     where: { id },
   });
 
-  const usedInRoutine = await prisma.routineSubject.count({
-    where: { subjectId: id },
-  });
+  const [usedInRoutine, weeklyMarksCount, monthlyResultCount] = await Promise.all([
+    prisma.routineSubject.count({
+      where: { subjectId: id },
+    }),
+    prisma.weeklyMarksSheet.count({
+      where: { subjectId: id },
+    }),
+    prisma.subjectResult.count({
+      where: {
+        subjectName: subject.subjectName,
+        examResult: { classId: subject.classId },
+      },
+    }),
+  ]);
 
   if (usedInRoutine > 0) {
     throw new AppError(
       409,
       'This subject is used in an exam routine and cannot be deleted',
+    );
+  }
+
+  if (weeklyMarksCount > 0) {
+    throw new AppError(
+      409,
+      'This subject has weekly marks and cannot be deleted',
+    );
+  }
+
+  if (monthlyResultCount > 0) {
+    throw new AppError(
+      409,
+      'This subject appears in monthly results for this class and cannot be deleted',
     );
   }
 
