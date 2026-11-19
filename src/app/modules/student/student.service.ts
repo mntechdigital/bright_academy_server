@@ -134,14 +134,11 @@ const getAll = async (query: Record<string, any>) => {
   // Support both:
   //  - URL-driven direct params: ?class=class-7&batch=B-4&gender=Female (and also ?classId=&batchId=)
   //  - Legacy filter JSON: ?filter={"classId":"...","batchId":"...","gender":"Female"}
-  // Ensure params are not silently stripped: controller logs req.query, service logs normalizedFilter
-  console.log("[studentService.getAll] incoming query:", query);
   let parsedFilter: Record<string, any> = {};
   if (query.filter) {
     try {
       parsedFilter = typeof query.filter === "string" ? JSON.parse(query.filter) : query.filter;
-    } catch (e) {
-      console.warn("[studentService.getAll] failed to parse filter JSON:", query.filter, e);
+    } catch {
       parsedFilter = {};
     }
   }
@@ -154,7 +151,7 @@ const getAll = async (query: Record<string, any>) => {
 
   // Normalized filter that will be passed to builderQuery
   const normalizedFilter: Record<string, any> = { ...parsedFilter };
-  // Remove ambiguous raw keys — we re-add them normalized below
+  // Remove ambiguous raw keys �?" we re-add them normalized below
   delete normalizedFilter.class;
   delete normalizedFilter.classId;
   delete normalizedFilter.className;
@@ -170,7 +167,7 @@ const getAll = async (query: Record<string, any>) => {
     if (uuidRegex.test(classParam)) {
       normalizedFilter.classId = classParam;
     } else {
-      // classParam is a className like "class-7" — filter via relation
+      // classParam is a className like "class-7" �?" filter via relation
       // Use case-insensitive equals to avoid mismatch (class-7 vs Class-7)
       normalizedFilter.stdClass = { className: { equals: classParam, mode: "insensitive" } };
     }
@@ -180,17 +177,17 @@ const getAll = async (query: Record<string, any>) => {
     if (uuidRegex.test(batchParam)) {
       normalizedFilter.batchId = batchParam;
     } else {
-      // batchParam is a batch name like "B-4" — filter via relation, case-insensitive
+      // batchParam is a batch name like "B-4" �?" filter via relation, case-insensitive
       normalizedFilter.batch = { name: { equals: batchParam, mode: "insensitive" } };
     }
   }
 
   if (genderParam && genderParam !== "All" && genderParam !== "") {
-    // gender stored as "Male"/"Female" — use insensitive equals for robustness
+    // gender stored as "Male"/"Female" �?" use insensitive equals for robustness
     normalizedFilter.gender = { equals: genderParam, mode: "insensitive" };
   }
 
-  // search may come as ?search= or ?searchTerm= — combine with filters via AND
+  // search may come as ?search= or ?searchTerm= �?" combine with filters via AND
   const searchTerm = query.searchTerm ?? query.search ?? "";
 
   // Robust parse: query.orderBy may already be object if query parser did nested parse
@@ -198,8 +195,7 @@ const getAll = async (query: Record<string, any>) => {
   if (query.orderBy) {
     try {
       rawOrderBy = typeof query.orderBy === "string" ? JSON.parse(query.orderBy) : query.orderBy;
-    } catch (e) {
-      console.warn("[studentService.getAll] failed to parse orderBy, falling back:", query.orderBy, e);
+    } catch {
       rawOrderBy = { createdAt: "desc" };
     }
   }
@@ -221,11 +217,7 @@ const getAll = async (query: Record<string, any>) => {
     limit: query.limit ? Number(query.limit) : 10,
   });
 
-  console.log("[studentService.getAll] normalizedFilter:", normalizedFilter);
-  console.log("[studentService.getAll] where clause:", JSON.stringify(studentQuery.where, null, 2));
-  console.log("[studentService.getAll] orderBy:", JSON.stringify(rawOrderBy, null, 2), "needsNumericSort:", needsNumericRegNoSort);
-
-  // CRITICAL: count must use SAME where as findMany — otherwise Total Students / pagination stays unfiltered (514 / 52 pages)
+  // CRITICAL: count must use SAME where as findMany �?" otherwise Total Students / pagination stays unfiltered (514 / 52 pages)
   const whereForCount = studentQuery.where;
   const totalStudents = await prisma.student.count({
     where: whereForCount,
@@ -233,24 +225,27 @@ const getAll = async (query: Record<string, any>) => {
   const currentPage = Number(query.page) || 1;
   const totalPages = Math.ceil(totalStudents / studentQuery.take);
 
+  const studentInclude = {
+    stdClass: true,
+    batch: true,
+    _count: {
+      select: {
+        weeklyMarksSheets: true,
+        monthlyExamResults: true,
+      },
+    },
+  };
+
   let response: any[];
   // When sorting by stdRegNo (string column) we must sort numerically, not lexicographically.
   // String sort fails for varying lengths / prefixes (e.g., "9" > "10" lexicographically but 9 < 10 numerically).
   // Use DB-side CAST("stdRegNo" AS INTEGER) via raw query for stable numeric ordering, with pagination applied in DB.
-  // Counter-checked: class-8 string vs numeric identical for uniform 6-digit data, but numeric cast guarantees correctness across all classes/pages.
   if (needsNumericRegNoSort) {
     // Build raw WHERE fragments from normalizedFilter + searchTerm to mirror builderQuery's where
-    // Keep it explicit for class-filtered path (the only path that uses numeric stdRegNo sort)
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const whereClauses: any[] = [];
-    const params: any[] = [];
-    let paramIdx = 1;
-
-    // Helper to push Prisma.sql fragments safely
     const sqlConditions: Prisma.Sql[] = [];
 
     if (normalizedFilter.classId) {
@@ -282,8 +277,7 @@ const getAll = async (query: Record<string, any>) => {
 
     const whereSql = sqlConditions.length > 0 ? Prisma.sql`WHERE ${Prisma.join(sqlConditions, " AND ")}` : Prisma.empty;
 
-    // Raw IDs sorted numerically — pagination applied here, so serial (offset+index+1) is stable
-    // Use CAST with regex guard to avoid error on non-numeric stdRegNo (should not happen, but fallback to string)
+    // Raw IDs sorted numerically �?" pagination applied here, so serial (offset+index+1) is stable
     // TRIM handles inconsistent whitespace (e.g. " 806054 "); BIGINT avoids overflow vs INTEGER (max 2147483647)
     const sortedIds: { id: string }[] = await prisma.$queryRaw`
       SELECT s.id FROM "Student" s
@@ -295,52 +289,23 @@ const getAll = async (query: Record<string, any>) => {
       LIMIT ${limit} OFFSET ${offset}
     `;
     const ids = sortedIds.map((r) => r.id);
-    console.log("[studentService.getAll] sortedIds (raw numeric order):", JSON.stringify(sortedIds, null, 2));
-    // Debug: also log raw stdRegNo values in that order for class-8 diagnosis (re-query to surface actual stored values)
-    if (ids.length > 0) {
-      const debugRegs: { id: string; stdRegNo: string | null }[] = await prisma.$queryRaw`
-        SELECT s.id, s."stdRegNo" FROM "Student" s WHERE s.id IN (${Prisma.join(ids)})
-      `;
-      // Re-order debugRegs to sortedIds order for readability
-      const regById = new Map(debugRegs.map((r: any) => [r.id, r.stdRegNo]));
-      console.log("[studentService.getAll] stdRegNo in sorted order:", ids.map((id) => ({ id, stdRegNo: regById.get(id) })));
-      // If counts mismatch, surface warning (race/deleted row between queries)
-      if (debugRegs.length !== ids.length) {
-        console.warn("[studentService.getAll] WARNING: sortedIds vs debugRegs count mismatch", { sortedIds: ids.length, debugRegs: debugRegs.length });
-      }
-    }
     if (ids.length === 0) {
       response = [];
     } else {
       const unsorted = await prisma.student.findMany({
         where: { id: { in: ids } },
-        include: {
-          stdClass: true,
-          batch: true,
-          weeklyMarksSheets: true,
-          monthlyExamResults: true,
-        },
+        include: studentInclude,
       });
       // Re-order to match raw sorted order (Prisma IN does not preserve order)
       const byId = new Map(unsorted.map((s: any) => [s.id, s]));
       response = ids.map((id) => byId.get(id)).filter(Boolean) as any[];
-      // Step 3 debug: confirm re-assembly preserved order and didn't drop rows
-      console.log("[studentService.getAll] re-assembled response order:", response.map((r: any) => ({ id: r.id, stdRegNo: r.stdRegNo })));
-      if (response.length !== ids.length) {
-        console.warn("[studentService.getAll] WARNING: re-assembly dropped rows", { ids: ids.length, response: response.length, missing: ids.filter((id) => !byId.has(id)) });
-      }
     }
   } else {
     response = await prisma.student.findMany({
       ...studentQuery,
-      // ensure where is not overwritten — explicitly reuse whereForCount
+      // ensure where is not overwritten �?" explicitly reuse whereForCount
       where: whereForCount,
-      include: {
-        stdClass: true,
-        batch: true,
-        weeklyMarksSheets: true,
-        monthlyExamResults: true,
-      },
+      include: studentInclude,
     });
   }
 

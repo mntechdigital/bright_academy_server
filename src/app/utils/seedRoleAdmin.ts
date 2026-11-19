@@ -8,8 +8,8 @@ export const seedRoleAdmin = async () => {
   const existingAdmin = await prisma.adminUser.findFirst();
 
   if (!existingRole && !existingAdmin) {
-    prisma.$transaction(async (prisma) => {
-      const createRole = await prisma.role.create({
+    await prisma.$transaction(async (tx) => {
+      const createRole = await tx.role.create({
         data: {
           name: seedRoleAdminData.name,
           roleFeature: {
@@ -26,7 +26,7 @@ export const seedRoleAdmin = async () => {
 
       const hashedPassword = await bcrypt.hash(configs.password as string, 10);
 
-      await prisma.adminUser.create({
+      await tx.adminUser.create({
         data: {
           fullName: configs.adminFullName as string,
           email: configs.adminEmail as string,

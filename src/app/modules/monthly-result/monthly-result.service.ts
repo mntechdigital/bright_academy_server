@@ -93,7 +93,7 @@ const getAll = async (query: Record<string, any>) => {
 
   const searchTerm: string = query.searchTerm || "";
 
-  // stdRegNo / parentPhone / name are NOT columns on MonthlyExamResult itself —
+  // stdRegNo / parentPhone / name are NOT columns on MonthlyExamResult itself �?"
   // they live on the related Student model. Passing them into builderQuery's
   // flat searchFields produced an invalid Prisma query (silently failing to
   // "no results"). We build the nested search condition manually instead.
@@ -113,7 +113,7 @@ const getAll = async (query: Record<string, any>) => {
     : null;
 
   const monthlyResultQuery = builderQuery({
-    // searchFields intentionally left empty — search is handled above via searchCondition
+    // searchFields intentionally left empty �?" search is handled above via searchCondition
     searchFields: [],
     searchTerm: "",
     filter: restFilter,
@@ -150,18 +150,29 @@ const getAll = async (query: Record<string, any>) => {
   });
 
   // Sort each result's subject rows by its own class subject list (rows with
-  // unknown subjects go last, sorted by name). One fetch per distinct class.
+  // unknown subjects go last, sorted by name). Fetch subjects once per distinct class.
+  const classIds = [
+    ...new Set(
+      response
+        .map((result) => result.student?.classId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
   const subjectsByClass = new Map<string, { subjectName: string }[]>();
+  if (classIds.length > 0) {
+    const subjectLists = await Promise.all(
+      classIds.map((classId) => orderedSubjectsForClass(classId)),
+    );
+    classIds.forEach((classId, index) => {
+      subjectsByClass.set(classId, subjectLists[index]);
+    });
+  }
   for (const result of response) {
     const classId = result.student?.classId;
     if (!classId) continue;
-    if (!subjectsByClass.has(classId)) {
-      subjectsByClass.set(classId, await orderedSubjectsForClass(classId));
-    }
-    result.results = sortRowsBySubjectOrder(
-      result.results,
-      subjectsByClass.get(classId)!,
-    );
+    const orderedSubjects = subjectsByClass.get(classId);
+    if (!orderedSubjects) continue;
+    result.results = sortRowsBySubjectOrder(result.results, orderedSubjects);
   }
 
   return {

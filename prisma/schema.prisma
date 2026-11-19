@@ -72,6 +72,9 @@ model Student {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   monthlyExamResults MonthlyExamResult[]
+
+  @@index([classId])
+  @@index([batchId])
 }
 
 model StdClass {
@@ -147,6 +150,8 @@ model WeeklyMarksSheet {
   updatedAt     DateTime @updatedAt
 
   @@unique([stdClassId, batchId, subjectId, studentId, week, year])
+  @@index([studentId])
+  @@index([stdClassId, month, year])
 }
 
 model MonthlyExamResult {
@@ -177,6 +182,10 @@ model MonthlyExamResult {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([studentId, month])
+  @@index([classId])
 }
 
 model SubjectResult {
@@ -193,6 +202,8 @@ model SubjectResult {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([examResultId])
 }
 
 model Notice {
@@ -246,4 +257,5 @@ model RoutineSubject {
   updatedAt   DateTime @updatedAt
 
   @@unique([weekId, subjectId])
+  @@index([subjectId])
 }
