@@ -16,7 +16,7 @@ router.post(
   studentController.createStudent,
 );
 
-router.get('/', studentController.getAllStudents);
+router.get('/', auth([featureNames.students]), studentController.getAllStudents);
 
 // Public route — login
 router.post(
@@ -49,7 +49,7 @@ router.delete(
 );
 
 // Dynamic route always at bottom
-router.get('/:id', studentController.getStudentById);
+router.get('/:id', auth([featureNames.students]), studentController.getStudentById);
 
 export const StudentRoutes = router;
 
