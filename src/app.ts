@@ -3,8 +3,6 @@ import cors from 'cors';
 import config from './app/configs';
 import { globalErrorHandler } from './app/middlewares/globalErrorHandler';
 import notFoundErrorHandler from './app/middlewares/notFoundErrorHandler';
-import { seedRoleAdmin } from './app/utils/seedRoleAdmin';
-import { seedTeachers } from './app/utils/seedTeacher';
 import cookieParser from 'cookie-parser';
 import router from './app/routes';
 
@@ -52,9 +50,5 @@ app.use(notFoundErrorHandler);
 
 // Running the server
 app.listen(config.port, () => {
-  // Seed the admin role if it doesn't exist
-  seedRoleAdmin();
-  // Seed 30 teachers
-  seedTeachers();
   console.log(`Server is running on port ${config.port}`);
 });

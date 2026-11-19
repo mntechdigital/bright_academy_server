@@ -54,19 +54,26 @@ export const createWeeklyMarksSheet = async (payload: any) => {
 };
 
 export const getAllWeeklyMarksSheets = async (query: Record<string, any>) => {
+  const page = Number(query.page) || 1;
+  const requestedLimit =
+    query.limit !== undefined ? Number(query.limit) : 100;
+  const limit = Math.min(
+    Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 100, 1),
+    500,
+  );
+
   const weeklyMarksSheetQuery = builderQuery({
     searchFields: ["title"], // adjust field as needed
     searchTerm: query.searchTerm,
     filter: query.filter ? JSON.parse(query.filter) : {},
     orderBy: query.orderBy ? JSON.parse(query.orderBy) : { createdAt: "desc" },
-    page: query.page ? Number(query.page) : 1,
-    limit: query.limit ? Number(query.limit) : 1000000,
+    page,
+    limit,
   });
 
   const totalItems = await prisma.weeklyMarksSheet.count({
     where: weeklyMarksSheetQuery.where,
   });
-  const currentPage = Number(query.page) || 1;
   const totalPages = Math.ceil(totalItems / weeklyMarksSheetQuery.take);
 
   const data = await prisma.weeklyMarksSheet.findMany({
@@ -83,7 +90,7 @@ export const getAllWeeklyMarksSheets = async (query: Record<string, any>) => {
     meta: {
       totalItems,
       totalPages,
-      currentPage,
+      currentPage: page,
     },
     data,
   };
@@ -116,6 +123,7 @@ export const getWeeklyMarksSheetsByStudent = async (studentId: string) => {
     orderBy: {
       createdAt: "desc",
     },
+    take: 500,
   });
 };
 
@@ -248,6 +256,7 @@ export const getWeeklyMarksSheetsByFilters = async (params: {
     orderBy: {
       createdAt: "desc",
     },
+    take: 500,
   });
 
   console.log("FILTER RESULT COUNT =>", result.length);

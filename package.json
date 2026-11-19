@@ -8,6 +8,7 @@
     "postinstall": "prisma generate",
     "start:prod": "node ./dist/app.js",
     "start:dev": "ts-node-dev --respawn --transpile-only ./src/app.ts",
+    "seed": "ts-node-dev --transpile-only ./src/scripts/seed.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prettier": "prettier --ignore-path .gitignore --write \"./src/**/*.+(js|ts|json)\"",
