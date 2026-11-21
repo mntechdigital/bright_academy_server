@@ -4,6 +4,12 @@ import {
   orderedSubjectsForClass,
   sortRowsBySubjectOrder,
 } from "../subject/subject.util";
+import {
+  computeAndApplyMonthlySummary,
+  getMonthlyGpaGradeFromTotals,
+  getStudentGroup,
+  computeMonthlyResultSummary,
+} from "../../utils/monthlyResultSummary";
 
 /**
  * Create Monthly Result
@@ -35,28 +41,37 @@ const create = async (payload: any) => {
     },
   });
 
+  const studentInfo = await prisma.student.findUniqueOrThrow({
+    where: { id: studentId },
+    select: {
+      classId: true,
+      batchId: true,
+      stdRegNo: true,
+      stdClass: { select: { className: true } },
+    },
+  });
+
+  const classSubjects = await orderedSubjectsForClass(studentInfo.classId);
+  const summary = computeMonthlyResultSummary({
+    resultSubjects: results || [],
+    classSubjects,
+    group: getStudentGroup(studentInfo.stdRegNo),
+    classNumber: studentInfo.stdClass?.className,
+    fallbackTotalMarks: restPayload.totalMarks,
+  });
+
   const created = await prisma.monthlyExamResult.create({
     data: {
       ...restPayload,
+      totalMarks: summary.full,
+      gpa: summary.gpa,
+      grade: summary.grade,
 
-      student: {
-        connect: {
-          id: studentId,
-        },
-      },
+      student: { connect: { id: studentId } },
+      stdClass: { connect: { id: studentInfo.classId } },
 
-      stdClass: {
-        connect: {
-          id: student.classId,
-        },
-      },
-
-      ...(student.batchId && {
-        batch: {
-          connect: {
-            id: student.batchId,
-          },
-        },
+      ...(studentInfo.batchId && {
+        batch: { connect: { id: studentInfo.batchId } },
       }),
 
       results: {
@@ -65,17 +80,14 @@ const create = async (payload: any) => {
     },
 
     include: {
-      student: true,
+      student: { include: { stdClass: true } },
       batch: true,
       results: true,
     },
   });
 
-  created.results = sortRowsBySubjectOrder(
-    created.results,
-    await orderedSubjectsForClass(student.classId),
-  );
-
+  created.results = sortRowsBySubjectOrder(created.results, classSubjects);
+  await computeAndApplyMonthlySummary(created);
   return created;
 };
 
@@ -169,10 +181,13 @@ const getAll = async (query: Record<string, any>) => {
   }
   for (const result of response) {
     const classId = result.student?.classId;
-    if (!classId) continue;
-    const orderedSubjects = subjectsByClass.get(classId);
-    if (!orderedSubjects) continue;
-    result.results = sortRowsBySubjectOrder(result.results, orderedSubjects);
+    if (classId) {
+      const orderedSubjects = subjectsByClass.get(classId);
+      if (orderedSubjects) {
+        result.results = sortRowsBySubjectOrder(result.results, orderedSubjects);
+      }
+    }
+    await computeAndApplyMonthlySummary(result);
   }
 
   return {
@@ -202,13 +217,14 @@ const getById = async (id: string) => {
     },
   });
 
-  if (result?.student.classId) {
+  if (result?.student?.classId) {
     result.results = sortRowsBySubjectOrder(
       result.results,
       await orderedSubjectsForClass(result.student.classId),
     );
   }
 
+  if (result) await computeAndApplyMonthlySummary(result);
   return result;
 };
 
@@ -236,17 +252,43 @@ const update = async (id: string, payload: any) => {
     };
   }
 
-  return prisma.monthlyExamResult.update({
+  const updated = await prisma.monthlyExamResult.update({
     where: { id },
     data: {
       ...restPayload,
       ...(resultsUpdate && { results: resultsUpdate }),
     },
     include: {
-      student: true,
+      student: { include: { stdClass: true } },
       results: true,
     },
   });
+
+  // Recompute GPA/Grade/TotalMarks on server for consistency (do not trust client totals).
+  const classId = updated.student?.classId;
+  const classSubjects = classId ? await orderedSubjectsForClass(classId) : [];
+  const summary = computeMonthlyResultSummary({
+    resultSubjects: updated.results || [],
+    classSubjects,
+    group: getStudentGroup(updated.student?.stdRegNo),
+    classNumber: updated.student?.stdClass?.className,
+    fallbackTotalMarks: updated.totalMarks,
+  });
+  const recalculated = await prisma.monthlyExamResult.update({
+    where: { id },
+    data: {
+      totalMarks: summary.full,
+      gpa: summary.gpa,
+      grade: summary.grade,
+    },
+    include: {
+      student: { include: { stdClass: true } },
+      results: true,
+    },
+  });
+  if (classId) recalculated.results = sortRowsBySubjectOrder(recalculated.results, classSubjects);
+  await computeAndApplyMonthlySummary(recalculated);
+  return recalculated;
 };
 
 /**
@@ -277,8 +319,9 @@ const calculatePositionsByClass = async (classId: string, month?: string) => {
   const allResults = await prisma.monthlyExamResult.findMany({
     where,
     include: {
-      student: true,
+      student: { include: { stdClass: true } },
       results: true,
+      stdClass: true,
     },
   });
 
@@ -286,8 +329,19 @@ const calculatePositionsByClass = async (classId: string, month?: string) => {
     return { classId, month: month || null, totalStudents: 0, updated: [] };
   }
 
-  const getAchievedMarks = (results: { marks: number }[]) =>
-    results.reduce((sum, r) => sum + r.marks, 0);
+  const classSubjects = await orderedSubjectsForClass(classId);
+  const getAchievedMarks = (result: any) => {
+    const classNumber = result.stdClass?.className || result.student?.stdClass?.className;
+    const group = getStudentGroup(result.student?.stdRegNo);
+    const summary = computeMonthlyResultSummary({
+      resultSubjects: result.results || [],
+      classSubjects,
+      group,
+      classNumber,
+      fallbackTotalMarks: result.totalMarks,
+    });
+    return summary.obtained;
+  };
 
   const getOrdinalSuffix = (n: number) => {
     const s = ["th", "st", "nd", "rd"];
@@ -297,7 +351,7 @@ const calculatePositionsByClass = async (classId: string, month?: string) => {
 
   // Achieved marks অনুযায়ী descending sort
   const sorted = [...allResults].sort(
-    (a, b) => getAchievedMarks(b.results) - getAchievedMarks(a.results),
+    (a, b) => getAchievedMarks(b) - getAchievedMarks(a),
   );
 
   // সব আপডেট একটা transaction-এ — atomic (সব হবে, নয়তো কিছুই হবে না)
