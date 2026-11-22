@@ -1,3 +1,4 @@
+type StudentGroup = "Science" | "Business" | "Humanity";
 import { orderedSubjectsForClass } from "../modules/subject/subject.util";
 
 export const GRADE_SYSTEM_100 = [
@@ -14,51 +15,84 @@ export const GRADE_SYSTEM_100 = [
 // moment follow the new ICT rule; older results keep stored values unchanged.
 // Change this single constant to adjust the rollout boundary.
 export const ICT_PRACTICAL_CUTOFF: Date = new Date("2026-11-22T00:00:00+06:00");
-export const ICT_FULL_MARKS = 50;
-export const ICT_EXAM_MAX = 25;
-export const ICT_EXAM_PASS_MARK = 9; // exam >= 9: practical mirrors exam; below: no practical
-
-export interface IctComputedMarks {
-  exam: number;
-  practical: number;
-  total: number;
-}
-
-export function computeIct(
-  examMark: number | null | undefined,
-  isAbsent: boolean,
-): IctComputedMarks {
-  if (isAbsent) return { exam: 0, practical: 0, total: 0 };
-  const exam = Math.max(0, Math.min(ICT_EXAM_MAX, Number(examMark) || 0));
-  if (exam >= ICT_EXAM_PASS_MARK) return { exam, practical: exam, total: exam * 2 };
-  return { exam, practical: 0, total: exam };
-}
-
-export type StudentGroup = "Science" | "Business" | "Humanity";
-
-type GroupMap = Record<StudentGroup, string>;
-type CombinedRowDef = {
-  displayKey: string;
-  map: GroupMap;
-  aliases: Record<StudentGroup, string[]>;
-  match: (parts: string[]) => boolean;
-};
-
 export const DEFAULT_SUBJECT_FULL_MARKS = 100;
-export const SUBJECT_FULL_MARKS_BY_NORMALIZED_NAME: Readonly<Record<string, number>> = {
-  ict: ICT_FULL_MARKS,
-};
-
+export const SUBJECT_FULL_MARKS_BY_NORMALIZED_NAME: Readonly<Record<string, number>> = { ict: 50 };
 export function getDefaultFullMarksForSubject(subjectName?: string | null): number {
   const key = normalizeSubjectName(String(subjectName ?? ""));
   return SUBJECT_FULL_MARKS_BY_NORMALIZED_NAME[key] ?? DEFAULT_SUBJECT_FULL_MARKS;
 }
 
-export function isIctSubject(subjectName?: string | null): boolean {
-  return normalizeSubjectName(String(subjectName ?? "")) === "ict";
+// ICT rule (class 9/10, any group): exam max 25, pass >= 9 => practical mirrors exam; fail/absent no practical.
+export const ICT_FULL_MARKS = 50;
+export const ICT_EXAM_MAX = 25;
+export const ICT_EXAM_PASS_MARK = 9;
+// Science practical rule (class 9/10, Science group only): exam max 75, pass >= 25 => +20 practical; fail/absent no practical.
+export const SCIENCE_FULL_MARKS = 100;
+export const SCIENCE_EXAM_MAX = 75;
+export const SCIENCE_EXAM_PASS_MARK = 25;
+export const SCIENCE_PRACTICAL_ADDED = 20; // out of 25, only 20 added
+
+export interface PracticalComputedMarks {
+  exam: number;
+  practical: number;
+  total: number;
+  examMax: number;
+  fullMarks: number;
+  passMark: number;
+  practicalAdded: number;
+  applicable: boolean;
 }
 
-export function isMonthlyResultNewForIct(
+export type PracticalSubjectSlot = "ict" | "science-physics" | "science-chemistry" | "science-biology" | "science-higher-math" | null;
+
+
+
+const SCIENCE_PRACTICAL_SUBJECT_KEYS = new Set(["physics", "chemistry", "biology"]);
+
+export function getGroupResolvedSubjectName(
+  subjectName: string | null | undefined,
+  group: string | null | undefined,
+  classNumber?: string | number | null,
+): string {
+  const original = String(subjectName ?? "").trim();
+  if (!isClass9Or10(classNumber) || !group) return original;
+  if (group !== "Science" && group !== "Business" && group !== "Humanity") return original;
+  const canonical = getCanonicalCombinedName(original, group, classNumber);
+  if (!canonical) return original;
+  const def = COMBINED_SUBJECT_ROWS.find((d) => d.displayKey === canonical);
+  if (!def) return original;
+  return def.map[group as StudentGroup] || original;
+}
+
+export function getPracticalSubjectSlot(
+  subjectName: string | null | undefined,
+  group: string | null | undefined,
+  classNumber?: string | number | null,
+): PracticalSubjectSlot {
+  if (!isClass9Or10(classNumber)) return null;
+  const resolved = getGroupResolvedSubjectName(subjectName, group, classNumber);
+  const key = normalizeSubjectName(resolved);
+  if (key === "ict") return "ict";
+  if (group === "Science") {
+    if (SCIENCE_PRACTICAL_SUBJECT_KEYS.has(key)) return `science-${key}` as PracticalSubjectSlot;
+    // Higher math row: canonical for Science is "H. math/Agriculture/H. science"
+    if (key === "h. math/agriculture/h. science" || key === "higher mathematics" || key === "higher math" || key === "h. math") {
+      return "science-higher-math";
+    }
+  }
+  return null;
+}
+
+export function isSciencePracticalSubject(
+  subjectName: string | null | undefined,
+  group: string | null | undefined,
+  classNumber?: string | number | null,
+): boolean {
+  const slot = getPracticalSubjectSlot(subjectName, group, classNumber);
+  return !!slot && slot !== "ict";
+}
+
+export function isMonthlyResultNewForPractical(
   createdAt?: string | Date | null,
   cutoff: Date = ICT_PRACTICAL_CUTOFF,
 ): boolean {
@@ -72,7 +106,83 @@ export function isIctPracticalApplicable(
   createdAt?: string | Date | null,
   cutoff: Date = ICT_PRACTICAL_CUTOFF,
 ): boolean {
-  return isClass9Or10(classNumber) && isMonthlyResultNewForIct(createdAt, cutoff);
+  return isClass9Or10(classNumber) && isMonthlyResultNewForPractical(createdAt, cutoff);
+}
+
+export function isSciencePracticalApplicable(
+  subjectName: string | null | undefined,
+  group: string | null | undefined,
+  classNumber?: string | number | null,
+  createdAt?: string | Date | null,
+  cutoff: Date = ICT_PRACTICAL_CUTOFF,
+): boolean {
+  return isSciencePracticalSubject(subjectName, group, classNumber) && isMonthlyResultNewForPractical(createdAt, cutoff);
+}
+
+export function isPracticalApplicable(
+  subjectName: string | null | undefined,
+  group: string | null | undefined,
+  classNumber?: string | number | null,
+  createdAt?: string | Date | null,
+  cutoff: Date = ICT_PRACTICAL_CUTOFF,
+): boolean {
+  const slot = getPracticalSubjectSlot(subjectName, group, classNumber);
+  if (!slot) return false;
+  if (slot === "ict") return isIctPracticalApplicable(classNumber, createdAt, cutoff);
+  return isSciencePracticalApplicable(subjectName, group, classNumber, createdAt, cutoff);
+}
+
+export function computeIct(
+  examMark: number | null | undefined,
+  isAbsent: boolean,
+): PracticalComputedMarks {
+  if (isAbsent) {
+    return { exam: 0, practical: 0, total: 0, examMax: ICT_EXAM_MAX, fullMarks: ICT_FULL_MARKS, passMark: ICT_EXAM_PASS_MARK, practicalAdded: ICT_EXAM_MAX, applicable: true };
+  }
+  const exam = Math.max(0, Math.min(ICT_EXAM_MAX, Number(examMark) || 0));
+  if (exam >= ICT_EXAM_PASS_MARK) {
+    return { exam, practical: exam, total: exam * 2, examMax: ICT_EXAM_MAX, fullMarks: ICT_FULL_MARKS, passMark: ICT_EXAM_PASS_MARK, practicalAdded: ICT_EXAM_MAX, applicable: true };
+  }
+  return { exam, practical: 0, total: exam, examMax: ICT_EXAM_MAX, fullMarks: ICT_FULL_MARKS, passMark: ICT_EXAM_PASS_MARK, practicalAdded: ICT_EXAM_MAX, applicable: true };
+}
+
+export function computeSciencePractical(
+  examMark: number | null | undefined,
+  isAbsent: boolean,
+): PracticalComputedMarks {
+  if (isAbsent) {
+    return { exam: 0, practical: 0, total: 0, examMax: SCIENCE_EXAM_MAX, fullMarks: SCIENCE_FULL_MARKS, passMark: SCIENCE_EXAM_PASS_MARK, practicalAdded: SCIENCE_PRACTICAL_ADDED, applicable: true };
+  }
+  const exam = Math.max(0, Math.min(SCIENCE_EXAM_MAX, Number(examMark) || 0));
+  if (exam >= SCIENCE_EXAM_PASS_MARK) {
+    return { exam, practical: SCIENCE_PRACTICAL_ADDED, total: exam + SCIENCE_PRACTICAL_ADDED, examMax: SCIENCE_EXAM_MAX, fullMarks: SCIENCE_FULL_MARKS, passMark: SCIENCE_EXAM_PASS_MARK, practicalAdded: SCIENCE_PRACTICAL_ADDED, applicable: true };
+  }
+  return { exam, practical: 0, total: exam, examMax: SCIENCE_EXAM_MAX, fullMarks: SCIENCE_FULL_MARKS, passMark: SCIENCE_EXAM_PASS_MARK, practicalAdded: SCIENCE_PRACTICAL_ADDED, applicable: true };
+}
+
+export function computePractical(
+  subjectSlot: PracticalSubjectSlot | string | null | undefined,
+  group: string | null | undefined,
+  classNumber: string | number | null | undefined,
+  examMark: number | null | undefined,
+  isAbsent: boolean,
+): PracticalComputedMarks {
+  void group; void classNumber;
+  if (subjectSlot === "ict") return computeIct(examMark, isAbsent);
+  if (typeof subjectSlot === "string" && subjectSlot.startsWith("science-")) return computeSciencePractical(examMark, isAbsent);
+  const exam = isAbsent ? 0 : Math.max(0, Number(examMark) || 0);
+  return { exam, practical: 0, total: exam, examMax: exam, fullMarks: exam, passMark: 0, practicalAdded: 0, applicable: false };
+}
+
+export function isIctSubject(subjectName?: string | null): boolean {
+  return normalizeSubjectName(String(subjectName ?? "")) === "ict";
+}
+
+export function isMonthlyResultNewForIct(
+  createdAt?: string | Date | null,
+  cutoff: Date = ICT_PRACTICAL_CUTOFF,
+): boolean {
+  return isMonthlyResultNewForPractical(createdAt, cutoff);
 }
 
 export function getIctStoredTotalFromExam(
@@ -82,11 +192,6 @@ export function getIctStoredTotalFromExam(
   return computeIct(examMark, isAbsent).total;
 }
 
-/**
- * Infer ICT exam mark from stored total. Ambiguous because totals can be
- * represented as either pass (even 18..50 => exam=total/2) or fail (0..8).
- * Use pass pattern when it matches; otherwise treat stored total as exam mark.
- */
 export function getIctExamFromStoredTotal(
   storedTotal: number | null | undefined,
   isAbsent: boolean,
@@ -103,7 +208,55 @@ export function getIctExamFromStoredTotal(
   return Math.max(0, Math.min(ICT_EXAM_MAX, normalized));
 }
 
+export function getScienceStoredTotalFromExam(
+  examMark: number | null | undefined,
+  isAbsent: boolean,
+): number {
+  return computeSciencePractical(examMark, isAbsent).total;
+}
 
+export function getScienceExamFromStoredTotal(
+  storedTotal: number | null | undefined,
+  isAbsent: boolean,
+): number | null {
+  if (isAbsent) return null;
+  const total = Number(storedTotal);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const normalized = Math.max(0, Math.min(SCIENCE_FULL_MARKS, total));
+  // New pass totals: exam+20, exam 25..75 => 45..95. Old pass totals (legacy +25 style, if any) may be exam+25 => 50..100.
+  // Prefer new rule: if total is in 45..95 and total-20 in 25..75, treat as pass with +20.
+  if (normalized >= SCIENCE_EXAM_PASS_MARK + SCIENCE_PRACTICAL_ADDED && normalized <= SCIENCE_EXAM_MAX + SCIENCE_PRACTICAL_ADDED) {
+    return normalized - SCIENCE_PRACTICAL_ADDED;
+  }
+  // Fallback: treat as failed exam mark.
+  return Math.max(0, Math.min(SCIENCE_EXAM_MAX, normalized));
+}
+
+export function getPracticalStoredTotalFromExam(
+  subjectName: string | null | undefined,
+  group: string | null | undefined,
+  classNumber: string | number | null | undefined,
+  examMark: number | null | undefined,
+  isAbsent: boolean,
+): number {
+  const slot = getPracticalSubjectSlot(subjectName, group, classNumber);
+  return computePractical(slot, group, classNumber, examMark, isAbsent).total;
+}
+
+export function getPracticalExamFromStoredTotal(
+  subjectName: string | null | undefined,
+  group: string | null | undefined,
+  classNumber: string | number | null | undefined,
+  storedTotal: number | null | undefined,
+  isAbsent: boolean,
+): number | null {
+  const slot = getPracticalSubjectSlot(subjectName, group, classNumber);
+  if (slot === "ict") return getIctExamFromStoredTotal(storedTotal, isAbsent);
+  if (slot && slot.startsWith("science-")) return getScienceExamFromStoredTotal(storedTotal, isAbsent);
+  if (isAbsent) return null;
+  const total = Number(storedTotal);
+  return Number.isFinite(total) ? total : null;
+}
 function normalizeSubjectName(name: string): string {
   return String(name ?? "")
     .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, " ")
@@ -135,7 +288,7 @@ export function isSubjectAbsent(row: any): boolean {
   if (row.isAbsent === true || row.isAbsent === "true" || row.isAbsent === 1) return true;
   return false;
 }
-export function getStudentGroup(regNo?: string | null): StudentGroup | "" {
+export function getStudentGroup(regNo?: string | null): "Science" | "Business" | "Humanity" | "" {
   if (!regNo) return "";
   if (regNo.includes("66")) return "Science";
   if (regNo.includes("77")) return "Business";
@@ -143,15 +296,15 @@ export function getStudentGroup(regNo?: string | null): StudentGroup | "" {
   return "";
 }
 
-const COMBINED_SUBJECT_ROWS: CombinedRowDef[] = [
-  { displayKey: "chemistry/history/finance and banking", map: { Science: "Chemistry", Humanity: "History of Bangladesh and World Civilization", Business: "Finance and Banking" }, aliases: { Science: ["chemistry","chemestry"], Humanity: ["history and world culture","history of bangladesh and world civilization","history"], Business: ["finance and banking"] }, match: (p) => p.some(x=>x.includes("chemistry")||x.includes("chemestry")) && p.some(x=>x.includes("history")) && p.some(x=>x.includes("finance")||x.includes("banking")) },
-  { displayKey: "physics/geography and environment/accounting", map: { Science: "Physics", Humanity: "Geography and Environment", Business: "Accounting" }, aliases: { Science: ["physics"], Humanity: ["geography and environment"], Business: ["accounting"] }, match: (p) => p.some(x=>x.includes("physics")) && p.some(x=>x.includes("geography")) && p.some(x=>x.includes("accounting")) },
-  { displayKey: "general science/bangladesh and global studies", map: { Science: "Bangladesh and Global Studies", Humanity: "General Science", Business: "General Science" }, aliases: { Science: ["bangladesh and global studies"], Humanity: ["general science"], Business: ["general science"] }, match: (p) => p.some(x=>x.includes("general science")) && p.some(x=>x.includes("bangladesh")||x.includes("global studies")) },
-  { displayKey: "biology/economics/civics/business entrepreneurship", map: { Science: "Biology", Humanity: "Civics / Economics", Business: "Business Entrepreneurship" }, aliases: { Science: ["biology"], Humanity: ["economics / civics","civics / economics","economics","civics"], Business: ["business entrepreneurship"] }, match: (p) => p.some(x=>x.includes("biology")) && p.some(x=>x.includes("civics")||x.includes("economics")) && p.some(x=>x.includes("entrepreneurship")) },
-  { displayKey: "h. math/agriculture/h. science", map: { Science: "H. math/Agriculture/H. science", Humanity: "Agriculture / Home Science", Business: "Agriculture / Home Science" }, aliases: { Science: ["higher mathematics","h. math"], Humanity: ["agriculture / home science","agriculture"], Business: ["agriculture / home science","agriculture"] }, match: (p) => p.some(x=>x.includes("h. math")||x.includes("higher math")||x.includes("higher mathematics")) && p.some(x=>x.includes("agriculture")) && p.some(x=>x.includes("h. science")||x.includes("home science")||x.includes("home economics")) },
+const COMBINED_SUBJECT_ROWS: any[] = [
+  { displayKey: "chemistry/history/finance and banking", map: { Science: "Chemistry", Humanity: "History of Bangladesh and World Civilization", Business: "Finance and Banking" }, aliases: { Science: ["chemistry","chemestry"], Humanity: ["history and world culture","history of bangladesh and world civilization","history"], Business: ["finance and banking"] }, match: (p: string[]) => p.some((x: string)=>x.includes("chemistry")||x.includes("chemestry")) && p.some(x=>x.includes("history")) && p.some(x=>x.includes("finance")||x.includes("banking")) },
+  { displayKey: "physics/geography and environment/accounting", map: { Science: "Physics", Humanity: "Geography and Environment", Business: "Accounting" }, aliases: { Science: ["physics"], Humanity: ["geography and environment"], Business: ["accounting"] }, match: (p: string[]) => p.some((x: string)=>x.includes("physics")) && p.some(x=>x.includes("geography")) && p.some(x=>x.includes("accounting")) },
+  { displayKey: "general science/bangladesh and global studies", map: { Science: "Bangladesh and Global Studies", Humanity: "General Science", Business: "General Science" }, aliases: { Science: ["bangladesh and global studies"], Humanity: ["general science"], Business: ["general science"] }, match: (p: string[]) => p.some((x: string)=>x.includes("general science")) && p.some(x=>x.includes("bangladesh")||x.includes("global studies")) },
+  { displayKey: "biology/economics/civics/business entrepreneurship", map: { Science: "Biology", Humanity: "Civics / Economics", Business: "Business Entrepreneurship" }, aliases: { Science: ["biology"], Humanity: ["economics / civics","civics / economics","economics","civics"], Business: ["business entrepreneurship"] }, match: (p: string[]) => p.some((x: string)=>x.includes("biology")) && p.some(x=>x.includes("civics")||x.includes("economics")) && p.some(x=>x.includes("entrepreneurship")) },
+  { displayKey: "h. math/agriculture/h. science", map: { Science: "H. math/Agriculture/H. science", Humanity: "Agriculture / Home Science", Business: "Agriculture / Home Science" }, aliases: { Science: ["higher mathematics","h. math"], Humanity: ["agriculture / home science","agriculture"], Business: ["agriculture / home science","agriculture"] }, match: (p: string[]) => p.some((x: string)=>x.includes("h. math")||x.includes("higher math")||x.includes("higher mathematics")) && p.some(x=>x.includes("agriculture")) && p.some(x=>x.includes("h. science")||x.includes("home science")||x.includes("home economics")) },
 ];
 
-function getCombinedRowDef(rowLabel: string): CombinedRowDef | undefined {
+function getCombinedRowDef(rowLabel: string): any {
   const normalized = normalizeRowLabel(rowLabel);
   const pKey = partsKey(rowLabel);
   const parts = splitParts(rowLabel);
@@ -180,7 +333,7 @@ function getCanonicalCombinedName(rowLabel: string, group: string, classNumber?:
   if (def) return def.displayKey;
   const storedNorm = normalizeSubjectName(rowLabel);
   for (const entry of COMBINED_SUBJECT_ROWS) {
-    for (const alias of entry.aliases[group as StudentGroup] || []) {
+    for (const alias of entry.aliases[group as "Science"|"Business"|"Humanity"] || []) {
       if (aliasMatches(storedNorm, normalizeSubjectName(alias))) return entry.displayKey;
     }
   }
@@ -192,7 +345,7 @@ function isCrossGroupLeftover(storedName: string, group: string, classNumber?: s
   if (getCanonicalCombinedName(storedName, group, classNumber)) return false;
   const storedNorm = normalizeSubjectName(storedName);
   for (const entry of COMBINED_SUBJECT_ROWS) {
-    for (const g of ["Science","Business","Humanity"] as StudentGroup[]) {
+    for (const g of ["Science","Business","Humanity"] as Array<"Science"|"Business"|"Humanity">) {
       if (g === group) continue;
       for (const alias of entry.aliases[g] || []) {
         if (aliasMatches(storedNorm, normalizeSubjectName(alias))) return true;
@@ -279,6 +432,8 @@ const getResultFullMarks = (row: any, subjectName?: string | null) => {
   return Number.isFinite(n) && n > 0 ? n : subjectDefault;
 };
 
+
+
 export function getIctMaxInputMarks(
   classNumber?: string | number | null,
   createdAt?: string | Date | null,
@@ -310,7 +465,8 @@ export function computeMonthlyResultSummary(args: {
     const originalName = String(row?.subjectName ?? "").trim();
     const canonical = isClass9Or10(classNumber) && group ? getCanonicalCombinedName(originalName, group, classNumber) : null;
     const canonicalName = canonical || originalName;
-    const ictApplicable = isIctSubject(canonicalName || originalName) && isIctPracticalApplicable(classNumber, createdAt, ictCutoff);
+    const slot = getPracticalSubjectSlot(canonicalName || originalName, group, classNumber);
+    const practicalApplicable = !!slot && isPracticalApplicable(canonicalName || originalName, group, classNumber, createdAt, ictCutoff);
     return {
       raw: row,
       originalName,
@@ -321,7 +477,7 @@ export function computeMonthlyResultSummary(args: {
       isCrossGroup: isCrossGroupLeftover(originalName, group || "", classNumber),
       meaningful: hasMeaningfulMarks(row),
       isAbsent: isSubjectAbsent(row),
-      ictApplicable,
+      practicalApplicable, slot,
     };
   });
   const byKey = new Map<string, typeof normalized>();
@@ -345,9 +501,9 @@ export function computeMonthlyResultSummary(args: {
       const key = normalizeSubjectName(name);
       const candidates = byKey.get(key) || [];
       const match = candidates.find(c => !c.isCrossGroup) || candidates[0];
-      const ictApplicable = isIctSubject(name) && isIctPracticalApplicable(classNumber, createdAt, ictCutoff);
+      const slot = getPracticalSubjectSlot(name, group, classNumber); const practicalApplicable = !!slot && isPracticalApplicable(name, group, classNumber, createdAt, ictCutoff);
       obtained += match ? match.marks : 0;
-      full += ictApplicable ? ICT_FULL_MARKS : getResultFullMarks(s || match?.raw, name);
+      full += slot === "ict" ? ICT_FULL_MARKS : (slot && slot.startsWith("science-") ? SCIENCE_FULL_MARKS : getResultFullMarks(s || match?.raw, name));
       used.add(key);
     }
     // Class 9/10 known-group rule: denominator is ALWAYS group slots x fullMarks.

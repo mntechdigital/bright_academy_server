@@ -29,8 +29,8 @@ const subjectResultSchema = z.object({
   point: z.number().min(0).optional().default(0),
   grade: z.string().optional().default("F"),
   isAbsent: z.boolean().optional().default(false),
-  // ICT contract: for new class 9/10 monthly, client sends exam mark in marks (0-25) and
-  // may also send ictExamMark; server computes practical/total via computeIct exactly once.
+  // Practical exam mark: ICT 0-25, Science practical 0-75. Server computes total once.
+  examMark: z.number().int().min(0).max(75).optional().nullable(),
   ictExamMark: z.number().int().min(0).max(25).optional().nullable(),
 });
 
