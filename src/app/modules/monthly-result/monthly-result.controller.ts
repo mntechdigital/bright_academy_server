@@ -68,17 +68,40 @@ export const deleteMonthlyResult = catchAsync(
 
 export const calculatePositions = catchAsync(
   async (req: Request, res: Response) => {
-    const { classId, month } = req.body;
+    const { classId, month, year, examName } = req.body;
+
+    if (!classId || !String(classId).trim()) {
+      return sendResponse(res, {
+        statusCode: 400,
+        success: false,
+        message: "classId is required",
+        data: null,
+      });
+    }
+    if (!month || !String(month).trim()) {
+      return sendResponse(res, {
+        statusCode: 400,
+        success: false,
+        message: "month is required",
+        data: null,
+      });
+    }
+    // Year is optional (temporary createdAt-based rule); "all"/empty means no year filter.
+    const yearValue = year === undefined || year === null || String(year).trim() === "" || String(year).toLowerCase() === "all"
+      ? undefined
+      : year;
 
     const result = await monthlyResultService.calculatePositionsByClass(
-      classId,
-      month,
+      String(classId).trim(),
+      String(month).trim(),
+      yearValue,
+      examName ? String(examName).trim() : undefined,
     );
 
     sendResponse(res, {
       statusCode: 200,
       success: true,
-      message: 'Positions calculated successfully',
+      message: `Positions calculated for ${result.totalStudents} students`,
       data: result,
     });
   },

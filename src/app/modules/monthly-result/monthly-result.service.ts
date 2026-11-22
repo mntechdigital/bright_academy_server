@@ -1,5 +1,6 @@
 import prisma from "../../../db/db.config";
 import { builderQuery } from "../../builders/prismaBuilderQuery";
+import AppError from "../../errors/AppError";
 import {
   orderedSubjectsForClass,
   sortRowsBySubjectOrder,
@@ -169,18 +170,10 @@ const create = async (payload: any) => {
 const getAll = async (query: Record<string, any>) => {
   const parsedFilter = query.filter ? JSON.parse(query.filter) : {};
 
-  // batchId is pulled out and handled separately: some older MonthlyExamResult
-  // rows have a null batchId even though the student has one, so a plain
-  // `batchId: value` equality filter misses them. We instead match either the
-  // exam record's own batchId OR the related student's batchId.
-  const { batchId, ...restFilter } = parsedFilter;
+  const { batchId, month, year, ...restFilter } = parsedFilter;
 
   const searchTerm: string = query.searchTerm || "";
 
-  // stdRegNo / parentPhone / name are NOT columns on MonthlyExamResult itself ï¿½?"
-  // they live on the related Student model. Passing them into builderQuery's
-  // flat searchFields produced an invalid Prisma query (silently failing to
-  // "no results"). We build the nested search condition manually instead.
   const searchCondition = searchTerm
     ? {
         OR: [
@@ -196,8 +189,44 @@ const getAll = async (query: Record<string, any>) => {
     ? { OR: [{ batchId }, { student: { batchId } }] }
     : null;
 
+  const MONTH_CANONICAL: Record<string, string> = {
+    "1": "January", "01": "January", "jan": "January", "january": "January",
+    "2": "February", "02": "February", "feb": "February", "february": "February",
+    "3": "March", "03": "March", "mar": "March", "march": "March",
+    "4": "April", "04": "April", "apr": "April", "april": "April",
+    "5": "May", "05": "May", "may": "May",
+    "6": "June", "06": "June", "jun": "June", "june": "June",
+    "7": "July", "07": "July", "jul": "July", "july": "July",
+    "8": "August", "08": "August", "aug": "August", "august": "August",
+    "9": "September", "09": "September", "sep": "September", "sept": "September", "september": "September",
+    "10": "October", "oct": "October", "october": "October",
+    "11": "November", "nov": "November", "november": "November",
+    "12": "December", "dec": "December", "december": "December",
+  };
+  const rawMonth = month ? String(month).trim() : "";
+  const monthKey = rawMonth.toLowerCase();
+  const normalizedMonth = rawMonth ? (MONTH_CANONICAL[monthKey] || rawMonth) : "";
+  // Month field is the exam month (stored on MonthlyExamResult.month), never createdAt.
+  const monthCondition = normalizedMonth
+    ? { month: { equals: normalizedMonth, mode: "insensitive" as const } }
+    : null;
+
+  // TEMPORARY year rule: no year column yet; filter by createdAt UTC year only when user explicitly selects a year.
+  const parsedYear =
+    year !== undefined && year !== null && String(year).trim() !== "" && String(year).toLowerCase() !== "all"
+      ? Number(year)
+      : null;
+  const hasYear = parsedYear !== null && Number.isInteger(parsedYear);
+  const yearCondition = hasYear
+    ? {
+        createdAt: {
+          gte: new Date(Date.UTC(parsedYear, 0, 1)),
+          lt: new Date(Date.UTC(parsedYear + 1, 0, 1)),
+        },
+      }
+    : null;
+
   const monthlyResultQuery = builderQuery({
-    // searchFields intentionally left empty ï¿½?" search is handled above via searchCondition
     searchFields: [],
     searchTerm: "",
     filter: restFilter,
@@ -210,6 +239,8 @@ const getAll = async (query: Record<string, any>) => {
     monthlyResultQuery.where,
     searchCondition,
     batchCondition,
+    monthCondition,
+    yearCondition,
   ].filter((c) => c !== null && Object.keys(c).length > 0);
 
   const where = andConditions.length > 0 ? { AND: andConditions } : {};
@@ -233,8 +264,6 @@ const getAll = async (query: Record<string, any>) => {
     },
   });
 
-  // Sort each result's subject rows by its own class subject list (rows with
-  // unknown subjects go last, sorted by name). Fetch subjects once per distinct class.
   const classIds = [
     ...new Set(
       response
@@ -271,7 +300,6 @@ const getAll = async (query: Record<string, any>) => {
     data: response,
   };
 };
-
 /**
  * Get Single Monthly Result
  */
@@ -427,47 +455,82 @@ const remove = async (id: string) => {
 };
 
 /**
- * Calculate positions for all students in a class (optionally scoped to a month)
+ * Calculate positions for students in a class for a specific month+year.
+ * Only results matching classId, month, year (and examName when provided) are ranked.
+ * Positions of other months/years are never touched.
  */
-const calculatePositionsByClass = async (classId: string, month?: string) => {
+const calculatePositionsByClass = async (
+  classId: string,
+  month: string,
+  year?: number | string | null,
+  examName?: string | null,
+) => {
   if (!classId) {
-    throw new Error("classId is required to calculate positions");
+    throw new AppError(400, "classId is required");
   }
+  if (!month || !String(month).trim()) {
+    throw new AppError(400, "month is required");
+  }
+  const yearProvided = year !== undefined && year !== null && String(year).trim() !== "" && String(year).toLowerCase() !== "all";
+  const parsedYear = Number(year);
+  if (yearProvided && (!Number.isInteger(parsedYear) || parsedYear < 2000 || parsedYear > 2100)) {
+    throw new AppError(400, "year is invalid");
+  }
+
+  const MONTH_CANONICAL: Record<string, string> = {
+    "1": "January", "01": "January", "jan": "January", "january": "January",
+    "2": "February", "02": "February", "feb": "February", "february": "February",
+    "3": "March", "03": "March", "mar": "March", "march": "March",
+    "4": "April", "04": "April", "apr": "April", "april": "April",
+    "5": "May", "05": "May", "may": "May",
+    "6": "June", "06": "June", "jun": "June", "june": "June",
+    "7": "July", "07": "July", "jul": "July", "july": "July",
+    "8": "August", "08": "August", "aug": "August", "august": "August",
+    "9": "September", "09": "September", "sep": "September", "sept": "September", "september": "September",
+    "10": "October", "oct": "October", "october": "October",
+    "11": "November", "nov": "November", "november": "November",
+    "12": "December", "dec": "December", "december": "December",
+  };
+  const rawMonth = String(month).trim();
+  const normalizedMonth = MONTH_CANONICAL[rawMonth.toLowerCase()] || rawMonth;
+  const normalizedExamName = examName ? String(examName).trim() : "";
 
   const where: any = {
-    student: { classId },
+    classId,
+    month: { equals: normalizedMonth, mode: "insensitive" as const }, // exam month field, never createdAt
   };
-  if (month) {
-    where.month = month;
+
+  // TEMPORARY year rule: optional, based on createdAt UTC year until year column is added.
+  if (yearProvided) {
+    const yearStart = new Date(Date.UTC(parsedYear, 0, 1));
+    const yearEnd = new Date(Date.UTC(parsedYear + 1, 0, 1));
+    where.createdAt = { gte: yearStart, lt: yearEnd };
+  }
+  if (normalizedExamName) {
+    where.monthlyExamName = normalizedExamName;
   }
 
-  // à¦¸à§‡à¦‡ à¦•à§à¦²à¦¾à¦¸à§‡à¦° (à¦“ à¦ªà§à¦°à¦¯à¦¼à§‹à¦œà¦¨à§‡ à¦¸à§‡à¦‡ à¦®à¦¾à¦¸à§‡à¦°) à¦¸à¦¬ à¦°à§‡à¦œà¦¾à¦²à§à¦Ÿ â€” pagination à¦›à¦¾à¦¡à¦¼à¦¾
   const allResults = await prisma.monthlyExamResult.findMany({
     where,
     include: {
-      student: { include: { stdClass: true } },
+      student: { select: { name: true, stdRegNo: true, classId: true, stdClass: { select: { className: true } } } },
       results: true,
-      stdClass: true,
+      stdClass: { select: { className: true } },
     },
   });
 
   if (allResults.length === 0) {
-    return { classId, month: month || null, totalStudents: 0, updated: [] };
+    return {
+      classId,
+      month: normalizedMonth,
+      year: yearProvided ? parsedYear : null,
+      examName: normalizedExamName || null,
+      totalStudents: 0,
+      updated: [],
+    };
   }
 
   const classSubjects = await orderedSubjectsForClass(classId);
-  const getAchievedMarks = (result: any) => {
-    const classNumber = result.stdClass?.className || result.student?.stdClass?.className;
-    const group = getStudentGroup(result.student?.stdRegNo);
-    const summary = computeMonthlyResultSummary({
-      resultSubjects: result.results || [],
-      classSubjects,
-      group,
-      classNumber,
-      fallbackTotalMarks: result.totalMarks,
-    });
-    return summary.obtained;
-  };
 
   const getOrdinalSuffix = (n: number) => {
     const s = ["th", "st", "nd", "rd"];
@@ -475,33 +538,57 @@ const calculatePositionsByClass = async (classId: string, month?: string) => {
     return s[(v - 20) % 10] || s[v] || s[0];
   };
 
-  // Achieved marks à¦…à¦¨à§à¦¯à¦¾à¦¯à¦¼à§€ descending sort
-  const sorted = [...allResults].sort(
-    (a, b) => getAchievedMarks(b) - getAchievedMarks(a),
-  );
+  const ranked = allResults
+    .map((result: any) => {
+      const classNumber = result.stdClass?.className || result.student?.stdClass?.className;
+      const group = getStudentGroup(result.student?.stdRegNo);
+      const summary = computeMonthlyResultSummary({
+        resultSubjects: result.results || [],
+        classSubjects,
+        group,
+        classNumber,
+        fallbackTotalMarks: result.totalMarks,
+        createdAt: result.createdAt,
+      });
+      return {
+        id: result.id,
+        studentName: result.student?.name,
+        obtained: summary.obtained,
+      };
+    })
+    .sort((a: any, b: any) => b.obtained - a.obtained);
 
-  // à¦¸à¦¬ à¦†à¦ªà¦¡à§‡à¦Ÿ à¦à¦•à¦Ÿà¦¾ transaction-à¦ â€” atomic (à¦¸à¦¬ à¦¹à¦¬à§‡, à¦¨à¦¯à¦¼à¦¤à§‹ à¦•à¦¿à¦›à§à¦‡ à¦¹à¦¬à§‡ à¦¨à¦¾)
-  const updates = sorted.map((result, index) =>
-    prisma.monthlyExamResult.update({
-      where: { id: result.id },
-      data: { position: `${index + 1}${getOrdinalSuffix(index + 1)}` },
-    }),
-  );
+  let currentPosition = 0;
+  let previousObtained: number | null = null;
+  const updates: { id: string; studentName?: string; position: string; obtained: number }[] = [];
 
-  await prisma.$transaction(updates);
+  ranked.forEach((item: any, index: number) => {
+    if (previousObtained === null || item.obtained !== previousObtained) {
+      currentPosition = index + 1;
+      previousObtained = item.obtained;
+    }
+    const position = `${currentPosition}${getOrdinalSuffix(currentPosition)}`;
+    updates.push({ id: item.id, studentName: item.studentName, position, obtained: item.obtained });
+  });
+
+  await prisma.$transaction(
+    updates.map((u) =>
+      prisma.monthlyExamResult.update({
+        where: { id: u.id },
+        data: { position: u.position },
+      }),
+    ),
+  );
 
   return {
     classId,
-    month: month || null,
-    totalStudents: sorted.length,
-    updated: sorted.map((r, i) => ({
-      id: r.id,
-      studentName: r.student?.name,
-      position: `${i + 1}${getOrdinalSuffix(i + 1)}`,
-    })),
+    month: normalizedMonth,
+    year: parsedYear,
+    examName: normalizedExamName || null,
+    totalStudents: updates.length,
+    updated: updates.map(({ id, studentName, position }) => ({ id, studentName, position })),
   };
 };
-
 export const monthlyResultService = {
   create,
   getAll,

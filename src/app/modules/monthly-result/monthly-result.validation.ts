@@ -1,37 +1,14 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-export const validateMonthlyResult = z.object({
-  studentId: z.string(),
-  batchId: z.string().optional(),
-  subjectId: z.string(),
-  fullMarks: z.number(),
-  highestMark: z.number(),
-  marksObtained: z.number(),
-  point: z.number(),
-  grade: z.string(),
-  totalMarks: z.number(),
-  gpa: z.number(),
-  gradePoint: z.string(),
-  position: z.string(),
-  preenst: z.string(),
-  absent: z.string(),
-  month: z.string(),
-});
-
-export const updatevalidateMonthlyResult = z.object({
-  studentId: z.string().optional(),
-  batchId: z.string().optional(),
-  subjectId: z.string().optional(),
-  fullMarks: z.number().optional(),
-  highestMark: z.number().optional(),
-  marksObtained: z.number().optional(),
-  point: z.number().optional(),
-  grade: z.string().optional(),
-  totalMarks: z.number().optional(),
-  gpa: z.number().optional(),
-  gradePoint: z.string().optional(),
-  position: z.string().optional(),
-  preenst: z.string().optional(),
-  absent: z.string().optional(),
-  month: z.string().optional(),
+export const calculateMonthlyPositionsValidation = z.object({
+  body: z.object({
+    classId: z.string().trim().min(1, "classId is required"),
+    month: z.string().trim().min(1, "month is required"),
+    year: z.union([z.string(), z.number()]).optional().nullable().refine((v) => {
+      if (v === undefined || v === null || String(v).trim() === "" || String(v).toLowerCase() === "all") return true;
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 2000 && n <= 2100;
+    }, "year is invalid"),
+    examName: z.string().trim().optional().nullable(),
+  }),
 });
