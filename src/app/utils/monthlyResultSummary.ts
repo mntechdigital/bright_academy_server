@@ -16,7 +16,23 @@ export const GRADE_SYSTEM_100 = [
 export const ICT_PRACTICAL_CUTOFF: Date = new Date("2026-11-22T00:00:00+06:00");
 export const ICT_FULL_MARKS = 50;
 export const ICT_EXAM_MAX = 25;
-export const ICT_PRACTICAL_MARKS = 25;
+export const ICT_EXAM_PASS_MARK = 9; // exam >= 9: practical mirrors exam; below: no practical
+
+export interface IctComputedMarks {
+  exam: number;
+  practical: number;
+  total: number;
+}
+
+export function computeIct(
+  examMark: number | null | undefined,
+  isAbsent: boolean,
+): IctComputedMarks {
+  if (isAbsent) return { exam: 0, practical: 0, total: 0 };
+  const exam = Math.max(0, Math.min(ICT_EXAM_MAX, Number(examMark) || 0));
+  if (exam >= ICT_EXAM_PASS_MARK) return { exam, practical: exam, total: exam * 2 };
+  return { exam, practical: 0, total: exam };
+}
 
 export type StudentGroup = "Science" | "Business" | "Humanity";
 
@@ -63,21 +79,28 @@ export function getIctStoredTotalFromExam(
   examMark: number | null | undefined,
   isAbsent: boolean,
 ): number {
-  if (isAbsent) return 0;
-  const exam = Number(examMark);
-  if (!Number.isFinite(exam)) return 0;
-  return Math.max(0, Math.min(ICT_EXAM_MAX, exam)) + ICT_PRACTICAL_MARKS;
+  return computeIct(examMark, isAbsent).total;
 }
 
+/**
+ * Infer ICT exam mark from stored total. Ambiguous because totals can be
+ * represented as either pass (even 18..50 => exam=total/2) or fail (0..8).
+ * Use pass pattern when it matches; otherwise treat stored total as exam mark.
+ */
 export function getIctExamFromStoredTotal(
   storedTotal: number | null | undefined,
   isAbsent: boolean,
 ): number | null {
   if (isAbsent) return null;
   const total = Number(storedTotal);
-  if (!Number.isFinite(total)) return null;
-  if (total <= 0) return null;
-  return Math.max(0, Math.min(ICT_EXAM_MAX, total - ICT_PRACTICAL_MARKS));
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const normalized = Math.max(0, Math.min(ICT_FULL_MARKS, total));
+  const isPassTotal =
+    normalized % 2 === 0 &&
+    normalized >= ICT_EXAM_PASS_MARK * 2 &&
+    normalized <= ICT_EXAM_MAX * 2;
+  if (isPassTotal) return normalized / 2;
+  return Math.max(0, Math.min(ICT_EXAM_MAX, normalized));
 }
 
 

@@ -9,16 +9,20 @@ import {
   getSingleMonthlyResult,
   calculatePositions,
 } from './monthly-result.controller';
-import { calculateMonthlyPositionsValidation } from "./monthly-result.validation";
+import {
+  calculateMonthlyPositionsValidation,
+  createMonthlyResultValidation,
+  updateMonthlyResultValidation,
+} from "./monthly-result.validation";
 import validation from '../../middlewares/validation';
 
 const router = express.Router();
 
-router.post('/', auth([featureNames.result]), createMonthlyResult);
+router.post('/', auth([featureNames.result]), validation(createMonthlyResultValidation), createMonthlyResult);
 router.get('/', auth([featureNames.result]), getAllMonthlyResults);
 router.post('/calculate-positions', auth([featureNames.result]), validation(calculateMonthlyPositionsValidation), calculatePositions);
 router.get('/:id', auth([featureNames.result]), getSingleMonthlyResult);
-router.patch('/:id', auth([featureNames.result]), updateMonthlyResult);
+router.patch('/:id', auth([featureNames.result]), validation(updateMonthlyResultValidation), updateMonthlyResult);
 router.delete('/:id', auth([featureNames.result]), deleteMonthlyResult);
 
 export const MonthlyResultRoutes = router;

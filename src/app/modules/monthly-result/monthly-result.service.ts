@@ -9,9 +9,10 @@ import {
   computeAndApplyMonthlySummary,
   getStudentGroup,
   computeMonthlyResultSummary,
+  computeIct,
   ICT_PRACTICAL_CUTOFF,
   ICT_EXAM_MAX,
-  ICT_PRACTICAL_MARKS,
+  ICT_EXAM_PASS_MARK,
   ICT_FULL_MARKS,
   getIctExamFromStoredTotal,
   getIctStoredTotalFromExam,
@@ -21,9 +22,10 @@ import {
   isSubjectAbsent,
 } from "../../utils/monthlyResultSummary";
 
-// Contract: client sends ICT exam mark (0-25) for NEW class 9/10 monthly results.
-// Server adds ICT_PRACTICAL_MARKS (25) and stores total marksObtained (25-50, or 0 if absent).
-// For OLD results or non-applicable ICT rows, client sends/stores total marks as before.
+// ICT contract (new class 9/10 monthly): client sends exam mark (0-25).
+// Server computes practical via computeIct: exam>=9 => practical=exam,total=exam*2;
+// exam<9 => practical=0,total=exam; absent => 0. Stored marks is total.
+// For old/non-applicable rows, marks is treated as stored total (clamped to 0-50).
 const normalizeIctResultRows = (args: {
   rows: any[];
   className?: string | number | null;
@@ -49,11 +51,10 @@ const normalizeIctResultRows = (args: {
       return { ...row, marks: total, fullMarks: ICT_FULL_MARKS, isAbsent: absent };
     }
 
-    // New class 9/10 ICT: client sends exam mark (max 25). Server stores exam+25.
-    const rawExam = row?.marks ?? row?.marksObtained ?? row?.examMarks;
-    const exam = absent ? null : Math.max(0, Math.min(ICT_EXAM_MAX, Number(rawExam) || 0));
-    const total = getIctStoredTotalFromExam(exam, absent);
-    return { ...row, marks: total, fullMarks: ICT_FULL_MARKS, isAbsent: absent };
+    // New class 9/10 ICT: client sends exam mark (max 25). Server computes exam/practical/total.
+    const rawExam = row?.marks ?? row?.marksObtained ?? row?.examMarks ?? row?.ictExamMark;
+    const ict = computeIct(absent ? null : rawExam, absent);
+    return { ...row, marks: ict.total, ictExamMark: ict.exam, fullMarks: ICT_FULL_MARKS, isAbsent: absent };
   }).map((row: any) => {
     // Ensure existing ICT row can be identified even if subject name casing differs.
     if (isIctSubject(row?.subjectName) || (row?.id && existingIct && row.id === existingIct.id)) {
@@ -75,9 +76,7 @@ const create = async (payload: any) => {
   });
 
   if (existingResult) {
-    throw new Error(
-      "Monthly result already exists for this student in this month"
-    );
+    throw new AppError(409, "Monthly result already exists for this student in this month");
   }
 
   const { studentId, results, ...restPayload } = payload;
@@ -98,20 +97,23 @@ const create = async (payload: any) => {
     className: studentInfo.stdClass?.className,
     createdAt: new Date(), // new result
   });
-  // Validate ICT: for NEW class 9/10, exam mark sent by client must be 0-25; stored total becomes 25-50, or 0 if absent.
+  // Validate ICT. New class 9/10: exam 0-25, total derived by computeIct.
   for (const r of normalizedResults) {
     if (!isIctSubject(r.subjectName)) continue;
     const ictApplicable = isIctPracticalApplicable(studentInfo.stdClass?.className, new Date());
     const absent = !!r.isAbsent;
     const total = Number(r.marks) || 0;
+    const exam = Number(r.ictExamMark ?? getIctExamFromStoredTotal(total, absent) ?? 0);
     if (ictApplicable) {
       if (absent) {
-        if (total !== 0) throw new Error("Absent ICT must have 0 marks");
-      } else if (total < ICT_PRACTICAL_MARKS || total > ICT_FULL_MARKS) {
-        throw new Error("ICT total must be 25-50 for new class 9/10 unless absent");
+        if (total !== 0) throw new AppError(400, "ICT: absent ICT must have 0 marks");
+      } else {
+        if (exam < 0 || exam > ICT_EXAM_MAX) throw new AppError(400, "ICT: exam mark must be between 0 and 25");
+        const expected = computeIct(exam, false);
+        if (total !== expected.total) throw new AppError(400, `ICT: total must be ${expected.total} for exam ${exam}`);
       }
     } else {
-      if (total < 0 || total > ICT_FULL_MARKS) throw new Error("ICT marks must be between 0 and 50");
+      if (total < 0 || total > ICT_FULL_MARKS) throw new AppError(400, "ICT: marks must be between 0 and 50");
     }
   }
   const summary = computeMonthlyResultSummary({
@@ -148,6 +150,7 @@ const create = async (payload: any) => {
           point: Number(r.point) || 0,
           grade: String(r.grade || "F"),
           isAbsent: !!r.isAbsent,
+          ...(isIctSubject(r.subjectName) && r.ictExamMark !== undefined ? { ictExamMark: Number(r.ictExamMark) } : {}),
         })),
       },
     },
@@ -346,7 +349,7 @@ const update = async (id: string, payload: any) => {
     where: { id },
     include: { student: { include: { stdClass: true } }, results: true },
   });
-  if (!existing) throw new Error("Monthly result not found");
+  if (!existing) throw new AppError(404, "Monthly result not found");
 
   // Destructure results from payload if present
   const { results, ictPracticalAdded, ...restPayload } = payload;
@@ -360,24 +363,32 @@ const update = async (id: string, payload: any) => {
   }
 
   const className = existing.student?.stdClass?.className;
-  const isOldClass910Result = !isMonthlyResultNewForIct(existing.createdAt) && /(9|10)/.test(String(className ?? ""));
+  const isOldClass910Result =
+    !isMonthlyResultNewForIct(existing.createdAt) && /(9|10)/.test(String(className ?? ""));
   const existingIct = (existing.results || []).find((r: any) => isIctSubject(r.subjectName));
-  const incomingIct = Array.isArray(results) ? results.find((r: any) => isIctSubject(r.subjectName) || (existingIct && r.id === existingIct.id)) : null;
+  const incomingIct = Array.isArray(results)
+    ? results.find((r: any) => isIctSubject(r.subjectName) || (existingIct && r.id === existingIct.id))
+    : null;
   const existingIctPracticalAdded = !!(existing as any).ictPracticalAdded;
   const requestedPracticalAdd = !!ictPracticalAdded && !existingIctPracticalAdded;
   if (requestedPracticalAdd) {
-    if (!isOldClass910Result) throw new Error("ICT practical can only be added for old class 9/10 results");
-    if (!existingIct) throw new Error("ICT subject not found");
+    // Old-result ICT practical: add practical = current ICT marks, so total doubles.
+    // Allowed only when marks are in pass/exam range 9-25 and not already applied.
+    if (!isOldClass910Result) throw new AppError(400, "ICT: practical can only be added for old class 9/10 results");
+    if (!existingIct) throw new AppError(400, "ICT: ICT subject not found");
     const existingAbsent = isSubjectAbsent(existingIct);
     const existingTotal = Number(existingIct.marks) || 0;
-    if (existingAbsent) throw new Error("Cannot add practical for absent ICT");
-    if (existingTotal > ICT_EXAM_MAX) throw new Error("ICT marks already above 25; practical may already be included");
+    if (existingAbsent) throw new AppError(400, "ICT: cannot add practical for absent ICT");
+    if (existingIctPracticalAdded) throw new AppError(400, "ICT: practical already added");
+    if (existingTotal < ICT_EXAM_PASS_MARK || existingTotal > ICT_EXAM_MAX) {
+      throw new AppError(400, "ICT: practical can be added only when marks are between 9 and 25");
+    }
     if (incomingIct) {
       const incomingTotal = Number(incomingIct.marks ?? incomingIct.marksObtained ?? 0) || 0;
-      if (incomingTotal !== existingTotal + ICT_PRACTICAL_MARKS) {
-        throw new Error("ICT practical add must increase stored marks by exactly 25");
+      if (incomingTotal !== existingTotal * 2) {
+        throw new AppError(400, "ICT: practical add must make total marks double the exam marks");
       }
-      if (isSubjectAbsent(incomingIct)) throw new Error("Cannot add practical for absent ICT");
+      if (isSubjectAbsent(incomingIct)) throw new AppError(400, "ICT: cannot add practical for absent ICT");
     }
   }
 
@@ -395,10 +406,18 @@ const update = async (id: string, payload: any) => {
       const ictApplicable = isIctPracticalApplicable(className, existing.createdAt);
       const absent = !!r.isAbsent;
       const total = Number(r.marks) || 0;
+      const exam = Number(r.ictExamMark ?? getIctExamFromStoredTotal(total, absent) ?? 0);
       if (ictApplicable) {
-        if (absent) { if (total !== 0) throw new Error("Absent ICT must have 0 marks"); }
-        else if (total < ICT_PRACTICAL_MARKS || total > ICT_FULL_MARKS) throw new Error("ICT total must be 25-50 for new class 9/10 unless absent");
-      } else if (total < 0 || total > ICT_FULL_MARKS) throw new Error("ICT marks must be between 0 and 50");
+        if (absent) {
+          if (total !== 0) throw new AppError(400, "ICT: absent ICT must have 0 marks");
+        } else {
+          if (exam < 0 || exam > ICT_EXAM_MAX) throw new AppError(400, "ICT: exam mark must be between 0 and 25");
+          const expected = computeIct(exam, false);
+          if (total !== expected.total) throw new AppError(400, `ICT: total must be ${expected.total} for exam ${exam}`);
+        }
+      } else if (total < 0 || total > ICT_FULL_MARKS) {
+        throw new AppError(400, "ICT: marks must be between 0 and 50");
+      }
     }
   }
   const nextIctPracticalAdded = existingIctPracticalAdded || requestedPracticalAdd || isMonthlyResultNewForIct(existing.createdAt);
@@ -416,6 +435,9 @@ const update = async (id: string, payload: any) => {
           point: result.point,
           grade: result.grade,
           isAbsent: !!result.isAbsent,
+          ...(isIctSubject(result.subjectName) && result.ictExamMark !== undefined
+            ? { ictExamMark: Number(result.ictExamMark) }
+            : {}),
         },
       })),
     };
