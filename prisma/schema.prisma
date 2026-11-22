@@ -177,6 +177,10 @@ model MonthlyExamResult {
   ictPracticalAdded Boolean @default(false)
 
   month String?
+  // Exam year selected in form; month/year identify the exam period. createdAt is record save time.
+  year  Int?
+  // Display-only publish date selected in form; not used for exam month/year semantics.
+  publishedDate DateTime?
 
   results SubjectResult[]
 

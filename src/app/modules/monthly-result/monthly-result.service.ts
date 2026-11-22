@@ -211,7 +211,7 @@ const getAll = async (query: Record<string, any>) => {
     ? { month: { equals: normalizedMonth, mode: "insensitive" as const } }
     : null;
 
-  // TEMPORARY year rule: no year column yet; filter by createdAt UTC year only when user explicitly selects a year.
+  // Year filter: prefer stored exam year field; fallback to createdAt UTC year while year is null.
   const parsedYear =
     year !== undefined && year !== null && String(year).trim() !== "" && String(year).toLowerCase() !== "all"
       ? Number(year)
@@ -219,10 +219,20 @@ const getAll = async (query: Record<string, any>) => {
   const hasYear = parsedYear !== null && Number.isInteger(parsedYear);
   const yearCondition = hasYear
     ? {
-        createdAt: {
-          gte: new Date(Date.UTC(parsedYear, 0, 1)),
-          lt: new Date(Date.UTC(parsedYear + 1, 0, 1)),
-        },
+        OR: [
+          { year: parsedYear } as any,
+          {
+            AND: [
+              { year: null } as any,
+              {
+                createdAt: {
+                  gte: new Date(Date.UTC(parsedYear, 0, 1)),
+                  lt: new Date(Date.UTC(parsedYear + 1, 0, 1)),
+                },
+              },
+            ],
+          },
+        ],
       }
     : null;
 
@@ -340,6 +350,14 @@ const update = async (id: string, payload: any) => {
 
   // Destructure results from payload if present
   const { results, ictPracticalAdded, ...restPayload } = payload;
+  if (restPayload.year !== undefined && restPayload.year !== null && String(restPayload.year).trim() !== "") {
+    const y = Number(restPayload.year);
+    if (Number.isInteger(y)) restPayload.year = y;
+  }
+  if (restPayload.publishedDate) {
+    const d = new Date(restPayload.publishedDate);
+    restPayload.publishedDate = Number.isNaN(d.getTime()) ? null : d;
+  }
 
   const className = existing.student?.stdClass?.className;
   const isOldClass910Result = !isMonthlyResultNewForIct(existing.createdAt) && /(9|10)/.test(String(className ?? ""));
