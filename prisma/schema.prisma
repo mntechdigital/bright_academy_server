@@ -172,6 +172,9 @@ model MonthlyExamResult {
   position   String
   present    Int
   absent     Int
+  // Manual one-time ICT practical adjustment for OLD class 9/10 results (< ICT_PRACTICAL_CUTOFF).
+  // Prevents double-add; NEW results (>= cutoff) are created with true.
+  ictPracticalAdded Boolean @default(false)
 
   month String?
 
@@ -189,13 +192,16 @@ model MonthlyExamResult {
 }
 
 model SubjectResult {
-  id          String @id @default(uuid())
+  id          String  @id @default(uuid())
   subjectName String
   marks       Int
   fullMarks   Int
   highestMark Int
   point       Float
   grade       String
+  // Explicit per-subject absence marker. marks=0 alone is ambiguous (real zero vs absent),
+  // so isAbsent=false by default preserves old data; new UI sets it explicitly.
+  isAbsent    Boolean @default(false)
 
   examResult   MonthlyExamResult @relation(fields: [examResultId], references: [id], onDelete: Cascade)
   examResultId String

@@ -1,4 +1,4 @@
-﻿import { orderedSubjectsForClass } from "../modules/subject/subject.util";
+import { orderedSubjectsForClass } from "../modules/subject/subject.util";
 
 export const GRADE_SYSTEM_100 = [
   { minMark: 80, maxMark: 100, grade: "A+", gradePoint: 5 },
@@ -9,6 +9,14 @@ export const GRADE_SYSTEM_100 = [
   { minMark: 33, maxMark: 39, grade: "D", gradePoint: 1 },
   { minMark: 0, maxMark: 32, grade: "F", gradePoint: 0 },
 ];
+
+// ICT practical rule cutoff (Asia/Dhaka, UTC+6). Results created at/after this
+// moment follow the new ICT rule; older results keep stored values unchanged.
+// Change this single constant to adjust the rollout boundary.
+export const ICT_PRACTICAL_CUTOFF: Date = new Date("2026-11-22T00:00:00+06:00");
+export const ICT_FULL_MARKS = 50;
+export const ICT_EXAM_MAX = 25;
+export const ICT_PRACTICAL_MARKS = 25;
 
 export type StudentGroup = "Science" | "Business" | "Humanity";
 
@@ -22,12 +30,54 @@ type CombinedRowDef = {
 
 export const DEFAULT_SUBJECT_FULL_MARKS = 100;
 export const SUBJECT_FULL_MARKS_BY_NORMALIZED_NAME: Readonly<Record<string, number>> = {
-  ict: 50,
+  ict: ICT_FULL_MARKS,
 };
 
 export function getDefaultFullMarksForSubject(subjectName?: string | null): number {
   const key = normalizeSubjectName(String(subjectName ?? ""));
   return SUBJECT_FULL_MARKS_BY_NORMALIZED_NAME[key] ?? DEFAULT_SUBJECT_FULL_MARKS;
+}
+
+export function isIctSubject(subjectName?: string | null): boolean {
+  return normalizeSubjectName(String(subjectName ?? "")) === "ict";
+}
+
+export function isMonthlyResultNewForIct(
+  createdAt?: string | Date | null,
+  cutoff: Date = ICT_PRACTICAL_CUTOFF,
+): boolean {
+  if (!createdAt) return false;
+  const t = createdAt instanceof Date ? createdAt.getTime() : new Date(createdAt).getTime();
+  return Number.isFinite(t) && t >= cutoff.getTime();
+}
+
+export function isIctPracticalApplicable(
+  classNumber?: string | number | null,
+  createdAt?: string | Date | null,
+  cutoff: Date = ICT_PRACTICAL_CUTOFF,
+): boolean {
+  return isClass9Or10(classNumber) && isMonthlyResultNewForIct(createdAt, cutoff);
+}
+
+export function getIctStoredTotalFromExam(
+  examMark: number | null | undefined,
+  isAbsent: boolean,
+): number {
+  if (isAbsent) return 0;
+  const exam = Number(examMark);
+  if (!Number.isFinite(exam)) return 0;
+  return Math.max(0, Math.min(ICT_EXAM_MAX, exam)) + ICT_PRACTICAL_MARKS;
+}
+
+export function getIctExamFromStoredTotal(
+  storedTotal: number | null | undefined,
+  isAbsent: boolean,
+): number | null {
+  if (isAbsent) return null;
+  const total = Number(storedTotal);
+  if (!Number.isFinite(total)) return null;
+  if (total <= 0) return null;
+  return Math.max(0, Math.min(ICT_EXAM_MAX, total - ICT_PRACTICAL_MARKS));
 }
 
 
@@ -53,6 +103,14 @@ function isClass9Or10(classNumber?: string | number | null): boolean {
   if (!match) return false;
   const num = Number(match[0]);
   return num === 9 || num === 10;
+}
+
+export function isSubjectAbsent(row: any): boolean {
+  if (!row) return false;
+  // Explicit marker (least invasive): isAbsent true means the student was absent
+  // for that subject. marks=0 alone is treated as a real zero, not absence.
+  if (row.isAbsent === true || row.isAbsent === "true" || row.isAbsent === 1) return true;
+  return false;
 }
 export function getStudentGroup(regNo?: string | null): StudentGroup | "" {
   if (!regNo) return "";
@@ -156,9 +214,20 @@ export function resolveStudentGroupSubjects<T extends { subjectName?: string; na
   return out;
 }
 
+const GRADE_SYSTEM_50 = [
+  { minMark: 40, maxMark: 50, grade: "A+", gradePoint: 5 },
+  { minMark: 35, maxMark: 39, grade: "A", gradePoint: 4 },
+  { minMark: 30, maxMark: 34, grade: "A-", gradePoint: 3.5 },
+  { minMark: 25, maxMark: 29, grade: "B", gradePoint: 3 },
+  { minMark: 20, maxMark: 24, grade: "C", gradePoint: 2 },
+  { minMark: 17, maxMark: 19, grade: "D", gradePoint: 1 },
+  { minMark: 0, maxMark: 16, grade: "F", gradePoint: 0 },
+];
+
 function getGradeFromMarks(marks: number, fullMarks = 100): { gradePoint: number; letterGrade: string } {
   if (fullMarks <= 0) return { gradePoint: 0, letterGrade: "F" };
-  for (const g of GRADE_SYSTEM_100) {
+  const system = fullMarks === 50 ? GRADE_SYSTEM_50 : GRADE_SYSTEM_100;
+  for (const g of system) {
     if (marks >= g.minMark && marks <= g.maxMark) return { gradePoint: g.gradePoint, letterGrade: g.grade };
   }
   return { gradePoint: 0, letterGrade: "F" };
@@ -175,6 +244,7 @@ export function getMonthlyGpaGradeFromTotals(totalObtained: number, totalFull: n
 
 const toNumber = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 const getResultMarks = (row: any) => {
+  if (isSubjectAbsent(row)) return 0;
   if (row?.marks !== undefined && row?.marks !== null && row?.marks !== "") return toNumber(row.marks, 0);
   if (row?.marksObtained !== undefined && row?.marksObtained !== null && row?.marksObtained !== "") return toNumber(row.marksObtained, 0);
   return 0;
@@ -186,18 +256,38 @@ const getResultFullMarks = (row: any, subjectName?: string | null) => {
   return Number.isFinite(n) && n > 0 ? n : subjectDefault;
 };
 
+export function getIctMaxInputMarks(
+  classNumber?: string | number | null,
+  createdAt?: string | Date | null,
+  cutoff: Date = ICT_PRACTICAL_CUTOFF,
+): number {
+  if (isIctSubject(classNumber as any)) return ICT_FULL_MARKS; // never used; guard
+  return ICT_FULL_MARKS;
+}
+
+export function getIctInputMaxForContext(
+  classNumber?: string | number | null,
+  createdAt?: string | Date | null,
+  cutoff: Date = ICT_PRACTICAL_CUTOFF,
+): number {
+  return isIctPracticalApplicable(classNumber, createdAt, cutoff) ? ICT_EXAM_MAX : ICT_FULL_MARKS;
+}
+
 export function computeMonthlyResultSummary(args: {
   resultSubjects?: any[] | null;
   classSubjects?: any[] | null;
   group?: string | null;
   classNumber?: string | number | null;
   fallbackTotalMarks?: number | null;
+  createdAt?: string | Date | null;
+  ictCutoff?: Date;
 }) {
-  const { resultSubjects = [], classSubjects = [], group = "", classNumber, fallbackTotalMarks } = args;
+  const { resultSubjects = [], classSubjects = [], group = "", classNumber, fallbackTotalMarks, createdAt, ictCutoff = ICT_PRACTICAL_CUTOFF } = args;
   const normalized = (resultSubjects || []).map((row) => {
     const originalName = String(row?.subjectName ?? "").trim();
     const canonical = isClass9Or10(classNumber) && group ? getCanonicalCombinedName(originalName, group, classNumber) : null;
     const canonicalName = canonical || originalName;
+    const ictApplicable = isIctSubject(canonicalName || originalName) && isIctPracticalApplicable(classNumber, createdAt, ictCutoff);
     return {
       raw: row,
       originalName,
@@ -207,6 +297,8 @@ export function computeMonthlyResultSummary(args: {
       fullMarks: getResultFullMarks(row, canonicalName || originalName),
       isCrossGroup: isCrossGroupLeftover(originalName, group || "", classNumber),
       meaningful: hasMeaningfulMarks(row),
+      isAbsent: isSubjectAbsent(row),
+      ictApplicable,
     };
   });
   const byKey = new Map<string, typeof normalized>();
@@ -230,8 +322,9 @@ export function computeMonthlyResultSummary(args: {
       const key = normalizeSubjectName(name);
       const candidates = byKey.get(key) || [];
       const match = candidates.find(c => !c.isCrossGroup) || candidates[0];
+      const ictApplicable = isIctSubject(name) && isIctPracticalApplicable(classNumber, createdAt, ictCutoff);
       obtained += match ? match.marks : 0;
-      full += getResultFullMarks(s || match?.raw);
+      full += ictApplicable ? ICT_FULL_MARKS : getResultFullMarks(s || match?.raw, name);
       used.add(key);
     }
     // Class 9/10 known-group rule: denominator is ALWAYS group slots x fullMarks.
@@ -288,6 +381,7 @@ export async function computeAndApplyMonthlySummary<T extends any>(result: T): P
     group,
     classNumber: className,
     fallbackTotalMarks: r.totalMarks,
+    createdAt: r.createdAt,
   });
   r.totalMarks = summary.full;
   r.gpa = summary.gpa;
