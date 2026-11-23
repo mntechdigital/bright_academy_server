@@ -503,7 +503,7 @@ export function computeMonthlyResultSummary(args: {
       const match = candidates.find(c => !c.isCrossGroup) || candidates[0];
       const slot = getPracticalSubjectSlot(name, group, classNumber); const practicalApplicable = !!slot && isPracticalApplicable(name, group, classNumber, createdAt, ictCutoff);
       obtained += match ? match.marks : 0;
-      full += slot === "ict" ? ICT_FULL_MARKS : (slot && slot.startsWith("science-") ? SCIENCE_FULL_MARKS : getResultFullMarks(s || match?.raw, name));
+      full += slot === "ict" ? ICT_FULL_MARKS : (slot && slot.startsWith("science-") ? SCIENCE_FULL_MARKS : (match ? match.fullMarks : getResultFullMarks(s, name)));
       used.add(key);
     }
     // Class 9/10 known-group rule: denominator is ALWAYS group slots x fullMarks.
