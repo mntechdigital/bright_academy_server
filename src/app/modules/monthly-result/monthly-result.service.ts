@@ -174,6 +174,13 @@ const create = async (payload: any) => {
 
   created.results = sortRowsBySubjectOrder(created.results, classSubjects);
   await computeAndApplyMonthlySummary(created);
+  schedulePositionCalculation(
+    studentInfo.classId,
+    payload.month,
+    payload.year,
+    payload.monthlyExamName,
+    2000,
+  );
   return created;
 };
 
@@ -508,6 +515,15 @@ const update = async (id: string, payload: any) => {
   });
   if (classId) recalculated.results = sortRowsBySubjectOrder(recalculated.results, classSubjects);
   await computeAndApplyMonthlySummary(recalculated);
+  if (classId && recalculated.month) {
+    schedulePositionCalculation(
+      classId,
+      recalculated.month,
+      recalculated.year,
+      recalculated.monthlyExamName,
+      500,
+    );
+  }
   return recalculated;
 };
 
@@ -515,9 +531,23 @@ const update = async (id: string, payload: any) => {
  * Delete Monthly Result
  */
 const remove = async (id: string) => {
-  return prisma.monthlyExamResult.delete({
+  const existing = await prisma.monthlyExamResult.findUnique({
+    where: { id },
+    select: { classId: true, month: true, year: true, monthlyExamName: true },
+  });
+  const deleted = await prisma.monthlyExamResult.delete({
     where: { id },
   });
+  if (existing?.classId && existing?.month) {
+    schedulePositionCalculation(
+      existing.classId,
+      existing.month,
+      existing.year,
+      existing.monthlyExamName,
+      500,
+    );
+  }
+  return deleted;
 };
 
 /**
@@ -566,11 +596,19 @@ const calculatePositionsByClass = async (
     month: { equals: normalizedMonth, mode: "insensitive" as const }, // exam month field, never createdAt
   };
 
-  // TEMPORARY year rule: optional, based on createdAt UTC year until year column is added.
+  // Year filter: support both explicit year column and createdAt year fallback
   if (yearProvided) {
     const yearStart = new Date(Date.UTC(parsedYear, 0, 1));
     const yearEnd = new Date(Date.UTC(parsedYear + 1, 0, 1));
-    where.createdAt = { gte: yearStart, lt: yearEnd };
+    where.OR = [
+      { year: parsedYear },
+      {
+        AND: [
+          { year: null },
+          { createdAt: { gte: yearStart, lt: yearEnd } },
+        ],
+      },
+    ];
   }
   if (normalizedExamName) {
     where.monthlyExamName = normalizedExamName;
@@ -655,11 +693,46 @@ const calculatePositionsByClass = async (
     updated: updates.map(({ id, studentName, position }) => ({ id, studentName, position })),
   };
 };
+
+const pendingRecalculations = new Map<string, NodeJS.Timeout>();
+
+/**
+ * Automatically recalculates and saves positions in the background.
+ * Debounced per class+month+year to avoid running repeatedly during rapid batch entries.
+ */
+const schedulePositionCalculation = (
+  classId: string,
+  month: string,
+  year?: number | string | null,
+  examName?: string | null,
+  delayMs = 2000,
+) => {
+  if (!classId || !month) return;
+  const key = `${classId}:${String(month).trim().toLowerCase()}:${year ?? ""}:${examName ? String(examName).trim() : ""}`;
+
+  const existingTimer = pendingRecalculations.get(key);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+  }
+
+  const timer = setTimeout(async () => {
+    pendingRecalculations.delete(key);
+    try {
+      await calculatePositionsByClass(classId, month, year, examName);
+      console.log(`[schedulePositionCalculation] Auto-calculated positions for class: ${classId}, month: ${month}`);
+    } catch (err) {
+      console.error("[schedulePositionCalculation] Error auto-calculating positions:", err);
+    }
+  }, delayMs);
+
+  pendingRecalculations.set(key, timer);
+};
 export const monthlyResultService = {
   create,
   getAll,
   getById,
   update,
   delete: remove,
+  schedulePositionCalculation,
   calculatePositionsByClass, // ðŸ‘ˆ à¦¯à§‹à¦— à¦•à¦°à§à¦¨
 };
