@@ -17,7 +17,9 @@ const create = async (payload: any) => {
       className: payload.className,
     },
     include: {
-      subjects: true,
+      subjects: {
+        orderBy: [{ sortOrder: 'asc' }, { subjectName: 'asc' }],
+      },
       students: true,
     },
   });
@@ -44,7 +46,9 @@ const getAll = async (query: Record<string, any>) => {
     ...studentClassQuery,
     include: {
       batches: true,
-      subjects: true,
+      subjects: {
+        orderBy: [{ sortOrder: 'asc' }, { subjectName: 'asc' }],
+      },
       students: true,
       _count: {
         select: { students: true },
@@ -66,7 +70,9 @@ const getById = async (id: string) => {
   return prisma.stdClass.findUniqueOrThrow({
     where: { id },
     include: {
-      subjects: true,
+      subjects: {
+        orderBy: [{ sortOrder: 'asc' }, { subjectName: 'asc' }],
+      },
       students: true,
       batches: true,
     },
