@@ -43,11 +43,39 @@ export interface PracticalComputedMarks {
   applicable: boolean;
 }
 
-export type PracticalSubjectSlot = "ict" | "science-physics" | "science-chemistry" | "science-biology" | "science-higher-math" | null;
-
-
+export type PracticalSubjectSlot =
+  | "ict"
+  | "science-physics"
+  | "science-chemistry"
+  | "science-biology"
+  | "science-higher-math"
+  | "science-agriculture"
+  | "science-home-science"
+  | null;
 
 const SCIENCE_PRACTICAL_SUBJECT_KEYS = new Set(["physics", "chemistry", "biology"]);
+
+export function isAgriculturePracticalKey(key: string): boolean {
+  return (
+    key === "agriculture" ||
+    key === "agriculture studies" ||
+    key === "agriculture / home science" ||
+    key === "agriculture/home science" ||
+    key === "krishi" ||
+    key === "krishi shiksha"
+  );
+}
+
+export function isHomeSciencePracticalKey(key: string): boolean {
+  return (
+    key === "home science" ||
+    key === "home economics" ||
+    key === "h. science" ||
+    key === "h.science" ||
+    key === "garhasthya" ||
+    key === "garhasthya biggan"
+  );
+}
 
 export function getGroupResolvedSubjectName(
   subjectName: string | null | undefined,
@@ -76,9 +104,20 @@ export function getPracticalSubjectSlot(
   if (group === "Science") {
     if (SCIENCE_PRACTICAL_SUBJECT_KEYS.has(key)) return `science-${key}` as PracticalSubjectSlot;
     // Higher math row: canonical for Science is "H. math/Agriculture/H. science"
-    if (key === "h. math/agriculture/h. science" || key === "higher mathematics" || key === "higher math" || key === "h. math") {
+    if (
+      key === "higher mathematics" ||
+      key === "higher math" ||
+      key === "h. math" ||
+      key === "h. math/agriculture/h. science"
+    ) {
       return "science-higher-math";
     }
+  }
+  if (isAgriculturePracticalKey(key) || key === "h. math/agriculture/h. science") {
+    return "science-agriculture";
+  }
+  if (isHomeSciencePracticalKey(key)) {
+    return "science-home-science";
   }
   return null;
 }

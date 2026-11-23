@@ -405,7 +405,7 @@ const update = async (id: string, payload: any) => {
       const isAddRequest =
         slot === "ict"
           ? incomingTotal === sourceTotal * 2 && incomingTotal !== sourceTotal
-          : slot.startsWith("science-") && group === "Science"
+          : slot.startsWith("science-") && (group === "Science" || slot === "science-agriculture" || slot === "science-home-science")
             ? incomingTotal === sourceTotal + SCIENCE_PRACTICAL_ADDED && incomingTotal !== sourceTotal
             : false;
       if (!isAddRequest) continue;
