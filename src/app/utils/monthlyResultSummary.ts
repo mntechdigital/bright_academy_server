@@ -498,6 +498,16 @@ function getGradeFromMarks(marks: number, fullMarks = 100): { gradePoint: number
   return { gradePoint: 0, letterGrade: "F" };
 }
 
+export function getGradeFromGPA(gpa: number): string {
+  if (gpa >= 5.0) return "A+";
+  if (gpa >= 4.0) return "A";
+  if (gpa >= 3.5) return "A-";
+  if (gpa >= 3.0) return "B";
+  if (gpa >= 2.0) return "C";
+  if (gpa >= 1.0) return "D";
+  return "F";
+}
+
 export function getMonthlyGpaGradeFromTotals(totalObtained: number, totalFull: number) {
   const safeObtained = Number.isFinite(totalObtained) ? Math.max(0, totalObtained) : 0;
   const safeFull = Number.isFinite(totalFull) && totalFull > 0 ? totalFull : 0;
@@ -582,6 +592,7 @@ export function computeMonthlyResultSummary(args: {
   const used = new Set<string>();
   let obtained = 0;
   let full = 0;
+  const countedPoints: number[] = [];
 
   const excludedRows: any[] = [];
 
@@ -592,8 +603,18 @@ export function computeMonthlyResultSummary(args: {
       const candidates = byKey.get(key) || [];
       const match = candidates.find(c => !c.isCrossGroup) || candidates[0];
       const slot = getPracticalSubjectSlot(name, group, classNumber); const practicalApplicable = !!slot && isPracticalApplicable(name, group, classNumber, createdAt, ictCutoff);
-      obtained += match ? match.marks : 0;
-      full += slot === "ict" ? ICT_FULL_MARKS : (slot && slot.startsWith("science-") ? SCIENCE_FULL_MARKS : (match ? match.fullMarks : getResultFullMarks(s, name, classNumber)));
+      const rowMarks = match ? match.marks : 0;
+      const rowFull = slot === "ict" ? ICT_FULL_MARKS : (slot && slot.startsWith("science-") ? SCIENCE_FULL_MARKS : (match ? match.fullMarks : getResultFullMarks(s, name, classNumber)));
+      obtained += rowMarks;
+      full += rowFull;
+      const absent = match ? isSubjectAbsent(match.raw) : false;
+      const gradeInfo = (!absent && match && match.marks !== null && match.marks !== undefined && rowFull > 0)
+        ? getGradeFromMarks(rowMarks, rowFull)
+        : { gradePoint: 0, letterGrade: "F" };
+      const point = (match && match.raw?.point !== undefined && match.raw?.point !== null && match.raw?.point !== "")
+        ? Number(match.raw.point)
+        : (match && match.marks !== null ? gradeInfo.gradePoint : 0);
+      countedPoints.push(point);
       used.add(key);
     }
     // Class 9/10 known-group rule: denominator is ALWAYS group slots x fullMarks.
@@ -616,6 +637,14 @@ export function computeMonthlyResultSummary(args: {
         if (!r.meaningful) continue;
         obtained += r.marks;
         full += r.fullMarks;
+        const absent = isSubjectAbsent(r.raw);
+        const gradeInfo = (!absent && r.marks !== null && r.marks !== undefined && r.fullMarks > 0)
+          ? getGradeFromMarks(r.marks, r.fullMarks)
+          : { gradePoint: 0, letterGrade: "F" };
+        const point = (r.raw?.point !== undefined && r.raw?.point !== null && r.raw?.point !== "")
+          ? Number(r.raw.point)
+          : gradeInfo.gradePoint;
+        countedPoints.push(point);
         used.add(r.key);
       }
     }
@@ -625,12 +654,36 @@ export function computeMonthlyResultSummary(args: {
       if (r.isCrossGroup && !r.meaningful) continue;
       obtained += r.marks;
       full += r.fullMarks;
+      const absent = isSubjectAbsent(r.raw);
+      const gradeInfo = (!absent && r.marks !== null && r.marks !== undefined && r.fullMarks > 0)
+        ? getGradeFromMarks(r.marks, r.fullMarks)
+        : { gradePoint: 0, letterGrade: "F" };
+      const point = (r.raw?.point !== undefined && r.raw?.point !== null && r.raw?.point !== "")
+        ? Number(r.raw.point)
+        : gradeInfo.gradePoint;
+      countedPoints.push(point);
       used.add(r.key);
     }
     if (full === 0 && fallbackTotalMarks && fallbackTotalMarks > 0) full = fallbackTotalMarks;
   }
 
-  return { ...getMonthlyGpaGradeFromTotals(obtained, full), excludedRows, subjectCount: studentSubjects.length || normalized.length };
+  const subjectCount = studentSubjects.length > 0 ? studentSubjects.length : (countedPoints.length || normalized.length || 1);
+  const totalPoints = countedPoints.reduce((sum, p) => sum + p, 0);
+  const avgGpa = subjectCount > 0 ? totalPoints / subjectCount : 0;
+  const gpa = Number(avgGpa.toFixed(2));
+  const grade = getGradeFromGPA(gpa);
+  const safeFull = full > 0 ? full : 0;
+  const percentage = safeFull > 0 ? Math.min(100, Math.floor((obtained / safeFull) * 100)) : 0;
+
+  return {
+    gpa,
+    grade,
+    percentage,
+    obtained,
+    full: safeFull,
+    excludedRows,
+    subjectCount,
+  };
 }
 
 export async function computeAndApplyMonthlySummary<T extends any>(result: T): Promise<T> {
