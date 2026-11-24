@@ -17,8 +17,58 @@ export const GRADE_SYSTEM_100 = [
 export const ICT_PRACTICAL_CUTOFF: Date = new Date("2026-11-22T00:00:00+06:00");
 export const DEFAULT_SUBJECT_FULL_MARKS = 100;
 export const SUBJECT_FULL_MARKS_BY_NORMALIZED_NAME: Readonly<Record<string, number>> = { ict: 50 };
-export function getDefaultFullMarksForSubject(subjectName?: string | null): number {
+
+export function isClass6To8(classNumber?: string | number | null): boolean {
+  if (classNumber === undefined || classNumber === null || classNumber === "") return false;
+  const match = String(classNumber).match(/\d+/);
+  if (!match) return false;
+  const num = Number(match[0]);
+  return num >= 6 && num <= 8;
+}
+
+export function isClass6To8FiftyMarkSubject(subjectName?: string | null): boolean {
   const key = normalizeSubjectName(String(subjectName ?? ""));
+  if (
+    key === "bangla 2nd paper" ||
+    key === "bangla 2nd" ||
+    key === "bangla second paper" ||
+    key.includes("bangla 2nd") ||
+    key.includes("bangla second")
+  ) {
+    return true;
+  }
+  if (
+    key === "english 2nd paper" ||
+    key === "english 2nd" ||
+    key === "english second paper" ||
+    key.includes("english 2nd") ||
+    key.includes("english second")
+  ) {
+    return true;
+  }
+  if (
+    key === "agriculture / home science" ||
+    key === "agriculture/home science" ||
+    key === "agriculture" ||
+    key === "home science" ||
+    key === "agriculture studies" ||
+    key === "krishi" ||
+    key === "garhasthya"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function getDefaultFullMarksForSubject(
+  subjectName?: string | null,
+  classNumber?: string | number | null,
+): number {
+  const key = normalizeSubjectName(String(subjectName ?? ""));
+  if (key === "ict") return ICT_FULL_MARKS;
+  if (isClass6To8(classNumber) && isClass6To8FiftyMarkSubject(subjectName)) {
+    return 50;
+  }
   return SUBJECT_FULL_MARKS_BY_NORMALIZED_NAME[key] ?? DEFAULT_SUBJECT_FULL_MARKS;
 }
 
@@ -464,9 +514,10 @@ const getResultMarks = (row: any) => {
   if (row?.marksObtained !== undefined && row?.marksObtained !== null && row?.marksObtained !== "") return toNumber(row.marksObtained, 0);
   return 0;
 };
-const getResultFullMarks = (row: any, subjectName?: string | null) => {
-  const subjectDefault = getDefaultFullMarksForSubject(subjectName ?? row?.subjectName);
-  if (subjectDefault !== DEFAULT_SUBJECT_FULL_MARKS) return subjectDefault;
+const getResultFullMarks = (row: any, subjectName?: string | null, classNumber?: string | number | null) => {
+  const subjectDefault = getDefaultFullMarksForSubject(subjectName ?? row?.subjectName, classNumber);
+  const key = normalizeSubjectName(String(subjectName ?? row?.subjectName ?? ""));
+  if (key === "ict") return ICT_FULL_MARKS;
   const n = Number(row?.fullMarks);
   return Number.isFinite(n) && n > 0 ? n : subjectDefault;
 };
@@ -512,7 +563,7 @@ export function computeMonthlyResultSummary(args: {
       canonicalName,
       key: normalizeSubjectName(canonicalName),
       marks: getResultMarks(row),
-      fullMarks: getResultFullMarks(row, canonicalName || originalName),
+      fullMarks: getResultFullMarks(row, canonicalName || originalName, classNumber),
       isCrossGroup: isCrossGroupLeftover(originalName, group || "", classNumber),
       meaningful: hasMeaningfulMarks(row),
       isAbsent: isSubjectAbsent(row),
@@ -542,7 +593,7 @@ export function computeMonthlyResultSummary(args: {
       const match = candidates.find(c => !c.isCrossGroup) || candidates[0];
       const slot = getPracticalSubjectSlot(name, group, classNumber); const practicalApplicable = !!slot && isPracticalApplicable(name, group, classNumber, createdAt, ictCutoff);
       obtained += match ? match.marks : 0;
-      full += slot === "ict" ? ICT_FULL_MARKS : (slot && slot.startsWith("science-") ? SCIENCE_FULL_MARKS : (match ? match.fullMarks : getResultFullMarks(s, name)));
+      full += slot === "ict" ? ICT_FULL_MARKS : (slot && slot.startsWith("science-") ? SCIENCE_FULL_MARKS : (match ? match.fullMarks : getResultFullMarks(s, name, classNumber)));
       used.add(key);
     }
     // Class 9/10 known-group rule: denominator is ALWAYS group slots x fullMarks.
