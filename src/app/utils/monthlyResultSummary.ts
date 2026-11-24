@@ -593,6 +593,7 @@ export function computeMonthlyResultSummary(args: {
   let obtained = 0;
   let full = 0;
   const countedPoints: number[] = [];
+  let hasFailedOrAbsentSubject = false;
 
   const excludedRows: any[] = [];
 
@@ -614,8 +615,14 @@ export function computeMonthlyResultSummary(args: {
       const point = (match && match.raw?.point !== undefined && match.raw?.point !== null && match.raw?.point !== "")
         ? Number(match.raw.point)
         : (match && match.marks !== null ? gradeInfo.gradePoint : 0);
+      const grade = (match && match.raw?.grade !== undefined && match.raw?.grade !== null && String(match.raw?.grade).trim() !== "")
+        ? String(match.raw.grade)
+        : gradeInfo.letterGrade;
       countedPoints.push(point);
       used.add(key);
+      if (absent || point === 0 || String(grade ?? "").trim().toUpperCase() === "F" || !match || match.marks === null || match.marks === undefined) {
+        hasFailedOrAbsentSubject = true;
+      }
     }
     // Class 9/10 known-group rule: denominator is ALWAYS group slots x fullMarks.
     // Rows outside the student's group are excluded from obtained/full and reported separately.
@@ -644,8 +651,14 @@ export function computeMonthlyResultSummary(args: {
         const point = (r.raw?.point !== undefined && r.raw?.point !== null && r.raw?.point !== "")
           ? Number(r.raw.point)
           : gradeInfo.gradePoint;
+        const grade = (r.raw?.grade !== undefined && r.raw?.grade !== null && String(r.raw?.grade).trim() !== "")
+          ? String(r.raw.grade)
+          : gradeInfo.letterGrade;
         countedPoints.push(point);
         used.add(r.key);
+        if (absent || point === 0 || String(grade ?? "").trim().toUpperCase() === "F") {
+          hasFailedOrAbsentSubject = true;
+        }
       }
     }
   } else {
@@ -661,8 +674,14 @@ export function computeMonthlyResultSummary(args: {
       const point = (r.raw?.point !== undefined && r.raw?.point !== null && r.raw?.point !== "")
         ? Number(r.raw.point)
         : gradeInfo.gradePoint;
+      const grade = (r.raw?.grade !== undefined && r.raw?.grade !== null && String(r.raw?.grade).trim() !== "")
+        ? String(r.raw.grade)
+        : gradeInfo.letterGrade;
       countedPoints.push(point);
       used.add(r.key);
+      if (absent || point === 0 || String(grade ?? "").trim().toUpperCase() === "F") {
+        hasFailedOrAbsentSubject = true;
+      }
     }
     if (full === 0 && fallbackTotalMarks && fallbackTotalMarks > 0) full = fallbackTotalMarks;
   }
@@ -671,7 +690,7 @@ export function computeMonthlyResultSummary(args: {
   const totalPoints = countedPoints.reduce((sum, p) => sum + p, 0);
   const avgGpa = subjectCount > 0 ? totalPoints / subjectCount : 0;
   const gpa = Number(avgGpa.toFixed(2));
-  const grade = getGradeFromGPA(gpa);
+  const grade = hasFailedOrAbsentSubject ? "" : getGradeFromGPA(gpa);
   const safeFull = full > 0 ? full : 0;
   const percentage = safeFull > 0 ? Math.min(100, Math.floor((obtained / safeFull) * 100)) : 0;
 
