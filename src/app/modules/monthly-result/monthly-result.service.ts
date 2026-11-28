@@ -15,6 +15,7 @@ import {
   ICT_EXAM_MAX,
   ICT_EXAM_PASS_MARK,
   ICT_FULL_MARKS,
+  getDefaultFullMarksForSubject,
   isMonthlyResultNewForPractical,
   isPracticalApplicable,
   isSubjectAbsent,
@@ -103,24 +104,13 @@ const create = async (payload: any) => {
     group,
     createdAt: new Date(), // new result
   });
-  // Validate practical subjects. Server computes expected total once.
+  // Validate subject marks
   for (const r of normalizedResults) {
-    const slot = getPracticalSubjectSlot(r.subjectName, group, studentInfo.stdClass?.className);
-    if (!slot) continue;
     const absent = !!r.isAbsent;
     const total = Number(r.marks) || 0;
-    const fullMarks = slot === "ict" ? ICT_FULL_MARKS : SCIENCE_FULL_MARKS;
-    const applicable = isPracticalApplicable(r.subjectName, group, studentInfo.stdClass?.className, new Date());
-    if (applicable) {
-      const exam = Number(r.examMark ?? r.ictExamMark ?? getPracticalExamFromStoredTotal(r.subjectName, group, studentInfo.stdClass?.className, total, absent) ?? 0);
-      if (absent) {
-        if (total !== 0) throw new AppError(400, `${r.subjectName}: absent must have 0 marks`);
-      } else {
-        const maxExam = slot === "ict" ? ICT_EXAM_MAX : SCIENCE_EXAM_MAX;
-        if (exam < 0 || exam > maxExam) throw new AppError(400, `${r.subjectName}: exam mark must be between 0 and ${maxExam}`);
-        const expected = computePractical(slot, group, studentInfo.stdClass?.className, exam, false);
-        if (total !== expected.total) throw new AppError(400, `${r.subjectName}: total must be ${expected.total} for exam ${exam}`);
-      }
+    const fullMarks = getDefaultFullMarksForSubject(r.subjectName, studentInfo.stdClass?.className);
+    if (absent) {
+      if (total !== 0) throw new AppError(400, `${r.subjectName}: absent must have 0 marks`);
     } else if (total < 0 || total > fullMarks) {
       throw new AppError(400, `${r.subjectName}: marks must be between 0 and ${fullMarks}`);
     }
@@ -434,22 +424,11 @@ const update = async (id: string, payload: any) => {
     : null;
   if (Array.isArray(normalizedIncoming)) {
     for (const r of normalizedIncoming) {
-      const slot = getPracticalSubjectSlot(r.subjectName, group, className);
-      if (!slot) continue;
       const absent = !!r.isAbsent;
       const total = Number(r.marks) || 0;
-      const fullMarks = slot === "ict" ? ICT_FULL_MARKS : SCIENCE_FULL_MARKS;
-      const applicable = isPracticalApplicable(r.subjectName, group, className, existing.createdAt);
-      if (applicable) {
-        const exam = Number(r.examMark ?? r.ictExamMark ?? getPracticalExamFromStoredTotal(r.subjectName, group, className, total, absent) ?? 0);
-        if (absent) {
-          if (total !== 0) throw new AppError(400, `${r.subjectName}: absent must have 0 marks`);
-        } else {
-          const maxExam = slot === "ict" ? ICT_EXAM_MAX : SCIENCE_EXAM_MAX;
-          if (exam < 0 || exam > maxExam) throw new AppError(400, `${r.subjectName}: exam mark must be between 0 and ${maxExam}`);
-          const expected = computePractical(slot, group, className, exam, false);
-          if (total !== expected.total) throw new AppError(400, `${r.subjectName}: total must be ${expected.total} for exam ${exam}`);
-        }
+      const fullMarks = getDefaultFullMarksForSubject(r.subjectName, className);
+      if (absent) {
+        if (total !== 0) throw new AppError(400, `${r.subjectName}: absent must have 0 marks`);
       } else if (total < 0 || total > fullMarks) {
         throw new AppError(400, `${r.subjectName}: marks must be between 0 and ${fullMarks}`);
       }
